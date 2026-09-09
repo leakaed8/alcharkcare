@@ -1,0 +1,24 @@
+databases:
+  - name: alcharkcare-db
+    plan: free
+    databaseName: alcharkcare
+    user: alcharkcare
+
+services:
+  - type: web
+    name: alcharkcare
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    preDeployCommand: npm run migrate
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alcharkcare-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true

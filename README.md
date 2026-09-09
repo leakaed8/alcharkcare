@@ -43,3 +43,29 @@ built yet.
 npm run build   # builds client/dist, installs server deps
 npm start       # serves the built frontend + API on one port (PORT env var)
 ```
+
+## Deploy to Render
+
+This repo includes a `render.yaml` Blueprint that provisions a free Postgres
+database and a web service in one step:
+
+1. Push this repo to GitHub (already done if you're reading this on a branch).
+2. In the Render dashboard, click **New > Blueprint** and select this repo.
+   Render will read `render.yaml` and create:
+   - `alcharkcare-db` — a free Postgres database
+   - `alcharkcare` — a web service that runs `npm run build` then `npm start`,
+     with `DATABASE_URL` wired to the database and a generated `JWT_SECRET`
+   The service's `preDeployCommand` runs `npm run migrate` automatically on
+   every deploy, so the schema is always up to date.
+3. Once the first deploy finishes, seed a test staff/patient login by
+   opening a shell for the `alcharkcare` service (Render dashboard > Shell)
+   and running:
+   ```bash
+   npm run seed
+   ```
+4. Your app will be live at the `.onrender.com` URL shown on the service page.
+
+If you'd rather set things up manually instead of using the Blueprint, create
+a Postgres database and a Node web service pointing at this repo with build
+command `npm run build`, start command `npm start`, and set `DATABASE_URL` /
+`JWT_SECRET` env vars yourself.
