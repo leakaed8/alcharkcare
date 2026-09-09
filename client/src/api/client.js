@@ -25,3 +25,18 @@ export async function apiFetch(path, options = {}) {
   }
   return data;
 }
+
+// For endpoints that take a file (multipart/form-data) -- no Content-Type
+// header here, the browser sets its own boundary.
+export async function apiUpload(path, formData) {
+  const token = getToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const res = await fetch(`/api${path}`, { method: 'POST', body: formData, headers });
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw new Error(data?.error || `Request failed (${res.status})`);
+  }
+  return data;
+}

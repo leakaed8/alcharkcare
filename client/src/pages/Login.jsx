@@ -29,52 +29,77 @@ export default function Login() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>Al Chark Patient CRM</h1>
+    <div className="auth-shell">
+      <div className="auth-card">
+        <h1>Al Chark</h1>
+        <p className="auth-subtitle">Patient CRM</p>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <button type="button" onClick={() => setMode('staff')} disabled={mode === 'staff'}>
-          Staff login
-        </button>
-        <button type="button" onClick={() => setMode('patient')} disabled={mode === 'patient'}>
-          Patient login
-        </button>
+        <div className="tab-group">
+          <button
+            type="button"
+            className={`tab-btn ${mode === 'staff' ? 'active' : ''}`}
+            onClick={() => setMode('staff')}
+          >
+            Staff login
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${mode === 'patient' ? 'active' : ''}`}
+            onClick={() => setMode('patient')}
+          >
+            Patient login
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {mode === 'staff' ? (
+            <>
+              <div className="form-field">
+                <input
+                  className="input"
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
+              <div className="form-field">
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="form-field">
+                <input
+                  className="input"
+                  placeholder="Phone number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+              <div className="form-field">
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="PIN"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {error && <p className="alert alert-error">{error}</p>}
+          <button type="submit" className="btn btn-primary btn-block">
+            Log in
+          </button>
+        </form>
       </div>
-
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {mode === 'staff' ? (
-          <>
-            <input
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </>
-        ) : (
-          <>
-            <input
-              placeholder="Phone number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="PIN"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-            />
-          </>
-        )}
-
-        {error && <p style={{ color: 'crimson' }}>{error}</p>}
-        <button type="submit">Log in</button>
-      </form>
     </div>
   );
 }

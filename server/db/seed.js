@@ -31,6 +31,18 @@ async function seed() {
      ON CONFLICT (sku) DO NOTHING`
   );
 
+  const vitaminD = await pool.query(`SELECT id FROM products WHERE sku = 'SKU-002'`);
+  if (vitaminD.rows[0]) {
+    await pool.query(
+      `INSERT INTO product_nutrients (product_id, nutrient_key, amount, unit)
+       SELECT $1, 'vitamin_d', 1000, 'IU'
+       WHERE NOT EXISTS (
+         SELECT 1 FROM product_nutrients WHERE product_id = $1 AND nutrient_key = 'vitamin_d'
+       )`,
+      [vitaminD.rows[0].id]
+    );
+  }
+
   console.log('Seed complete. Staff login: staff / staff123. Patient login: +96170123456 / 1234');
   await pool.end();
 }
