@@ -43,6 +43,25 @@ async function seed() {
     );
   }
 
+  const defaultTestTypes = [
+    ['vitamin_d', 'Vitamin D (25-OH)', 'ng/mL', 30, 100, ['vitamin d', '25-oh vitamin d', '25(oh)d', 'vit d', 'vitamin d3']],
+    ['vitamin_b12', 'Vitamin B12', 'pg/mL', 200, 900, ['vitamin b12', 'vit b12', 'b12', 'cobalamin']],
+    ['ferritin', 'Ferritin (iron stores)', 'ng/mL', 20, 250, ['ferritin']],
+    ['calcium', 'Calcium', 'mg/dL', 8.5, 10.5, ['calcium']],
+    ['magnesium', 'Magnesium', 'mg/dL', 1.7, 2.2, ['magnesium']],
+    ['folate', 'Folate', 'ng/mL', 3, 20, ['folate', 'folic acid']],
+    ['zinc', 'Zinc', 'mcg/dL', 60, 120, ['zinc']],
+    ['vitamin_c', 'Vitamin C', 'mg/L', 4, 20, ['vitamin c', 'ascorbic acid']],
+  ];
+  for (const [key, label, unit, refLow, refHigh, aliases] of defaultTestTypes) {
+    await pool.query(
+      `INSERT INTO lab_test_types (key, label, unit, ref_low, ref_high, aliases)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (key) DO NOTHING`,
+      [key, label, unit, refLow, refHigh, aliases]
+    );
+  }
+
   console.log('Seed complete. Staff login: staff / staff123. Patient login: +96170123456 / 1234');
   await pool.end();
 }

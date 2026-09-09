@@ -55,7 +55,7 @@ export default function MyCare() {
         <ul className="followup-list">
           {data.followups.map((f) => (
             <li key={f.id}>
-              {f.scheduled_date} — {f.status} {f.response ? `(${f.response})` : ''}
+              {new Date(f.scheduled_date).toLocaleDateString()} — {f.status} {f.response ? `(${f.response})` : ''}
             </li>
           ))}
         </ul>

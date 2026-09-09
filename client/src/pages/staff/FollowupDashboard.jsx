@@ -66,7 +66,7 @@ export default function FollowupDashboard() {
                 <td>
                   <Link to={`/staff/patients/${f.patient_id}`}>{f.patient_name}</Link>
                 </td>
-                <td>{f.scheduled_date}</td>
+                <td>{new Date(f.scheduled_date).toLocaleDateString()}</td>
                 <td>
                   <span className={`badge badge-status-${f.dashboard_status}`}>
                     {STATUS_LABELS[f.dashboard_status] || f.dashboard_status}
