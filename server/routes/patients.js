@@ -2,11 +2,16 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../db/pool');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const asyncHandler = require('../lib/asyncHandler');
 
 const router = express.Router();
 
+function isValidId(id) {
+  return /^\d+$/.test(id);
+}
+
 // Search patients by name or phone. Staff only.
-router.get('/', verifyToken, requireRole('staff', 'admin'), async (req, res) => {
+router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) {
     const { rows } = await pool.query(
@@ -22,10 +27,10 @@ router.get('/', verifyToken, requireRole('staff', 'admin'), async (req, res) => 
     [`%${q}%`]
   );
   res.json(rows);
-});
+}));
 
 // Create a patient. Staff only (self-service signup lives in /api/auth/patient/signup).
-router.post('/', verifyToken, requireRole('staff', 'admin'), async (req, res) => {
+router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const { name, phone, pin, dob, skin_type, hair_type, allergies, conditions, pregnancy_flag } = req.body;
   if (!name || !phone || !pin) {
     return res.status(400).json({ error: 'name, phone and pin are required' });
@@ -57,11 +62,14 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), async (req, res) =>
     ]
   );
   res.status(201).json(rows[0]);
-});
+}));
 
 // Update a patient's profile details (allergies, skin type, etc). Staff only.
-router.patch('/:id', verifyToken, requireRole('staff', 'admin'), async (req, res) => {
+router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid patient id' });
+  }
   const { name, dob, skin_type, hair_type, allergies, conditions, pregnancy_flag } = req.body;
 
   const { rows } = await pool.query(
@@ -91,12 +99,15 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), async (req, res
     return res.status(404).json({ error: 'Patient not found' });
   }
   res.json(rows[0]);
-});
+}));
 
 // Patient timeline: patient profile + visits (with products) + followups.
 // Staff can view any patient; a patient can only view their own record.
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid patient id' });
+  }
   const isStaff = req.user.role === 'staff' || req.user.role === 'admin';
   if (!isStaff && String(req.user.id) !== String(id)) {
     return res.status(403).json({ error: 'Forbidden' });
@@ -147,6 +158,6 @@ router.get('/:id', verifyToken, async (req, res) => {
   );
 
   res.json({ patient, visits: visitsResult.rows, followups: followupsResult.rows });
-});
+}));
 
 module.exports = router;
