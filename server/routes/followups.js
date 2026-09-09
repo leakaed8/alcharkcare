@@ -1,13 +1,14 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const asyncHandler = require('../lib/asyncHandler');
 
 const router = express.Router();
 
 // Follow-up dashboard: pending follow-ups with patient info, flagged as
 // overdue (scheduled_date < today) or due (scheduled_date = today), plus
 // escalated ones (response = 'worse'). Staff only.
-router.get('/', verifyToken, requireRole('staff', 'admin'), async (req, res) => {
+router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT f.id, f.scheduled_date, f.sent_date, f.response, f.patient_comment, f.status,
             v.id AS visit_id, v.complaint,
@@ -25,11 +26,14 @@ router.get('/', verifyToken, requireRole('staff', 'admin'), async (req, res) => 
      ORDER BY f.scheduled_date ASC`
   );
   res.json(rows);
-});
+}));
 
 // Log a patient's follow-up response (e.g. after a staff-initiated WhatsApp check-in).
-router.patch('/:id', verifyToken, requireRole('staff', 'admin'), async (req, res) => {
+router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
+  if (!/^\d+$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid follow-up id' });
+  }
   const { response, patient_comment, status } = req.body;
 
   const validResponses = ['better', 'same', 'worse', 'no_response'];
@@ -53,6 +57,6 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), async (req, res
     return res.status(404).json({ error: 'Follow-up not found' });
   }
   res.json(rows[0]);
-});
+}));
 
 module.exports = router;

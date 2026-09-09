@@ -1,17 +1,29 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const pool = require('../db/pool');
+const asyncHandler = require('../lib/asyncHandler');
 
 const router = express.Router();
 const TOKEN_TTL = '12h';
+
+// A patient PIN is only 4-6 digits, so login attempts must be throttled --
+// without this, a phone number is enough to brute-force the PIN outright.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Try again in a few minutes.' },
+});
 
 function signToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: TOKEN_TTL });
 }
 
 // Staff login: username + password
-router.post('/staff/login', async (req, res) => {
+router.post('/staff/login', loginLimiter, asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: 'username and password are required' });
@@ -25,10 +37,10 @@ router.post('/staff/login', async (req, res) => {
 
   const token = signToken({ id: staff.id, role: staff.role, name: staff.name });
   res.json({ token, user: { id: staff.id, name: staff.name, role: staff.role } });
-});
+}));
 
 // Patient login: phone + PIN
-router.post('/patient/login', async (req, res) => {
+router.post('/patient/login', loginLimiter, asyncHandler(async (req, res) => {
   const { phone, pin } = req.body;
   if (!phone || !pin) {
     return res.status(400).json({ error: 'phone and pin are required' });
@@ -42,11 +54,11 @@ router.post('/patient/login', async (req, res) => {
 
   const token = signToken({ id: patient.id, role: 'patient', name: patient.name });
   res.json({ token, user: { id: patient.id, name: patient.name, role: 'patient' } });
-});
+}));
 
 // Patient self-service signup: creates the account with a chosen PIN.
 // (Staff can also create a patient with a PIN directly via POST /api/patients.)
-router.post('/patient/signup', async (req, res) => {
+router.post('/patient/signup', loginLimiter, asyncHandler(async (req, res) => {
   const { name, phone, pin, dob } = req.body;
   if (!name || !phone || !pin) {
     return res.status(400).json({ error: 'name, phone and pin are required' });
@@ -71,6 +83,6 @@ router.post('/patient/signup', async (req, res) => {
   const patient = rows[0];
   const token = signToken({ id: patient.id, role: 'patient', name: patient.name });
   res.status(201).json({ token, user: { id: patient.id, name: patient.name, role: 'patient' } });
-});
+}));
 
 module.exports = router;

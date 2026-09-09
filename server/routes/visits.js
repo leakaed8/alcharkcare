@@ -1,13 +1,14 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const asyncHandler = require('../lib/asyncHandler');
 
 const router = express.Router();
 
 // Log a visit. Staff only.
 // Body: { patient_id, complaint, assessment, lifestyle_advice, next_followup_date,
 //         photo_urls, products: [{ product_id, is_supplement, dosing_notes }] }
-router.post('/', verifyToken, requireRole('staff', 'admin'), async (req, res) => {
+router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const {
     patient_id,
     complaint,
@@ -18,8 +19,13 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), async (req, res) =>
     products,
   } = req.body;
 
-  if (!patient_id) {
-    return res.status(400).json({ error: 'patient_id is required' });
+  if (!patient_id || !/^\d+$/.test(String(patient_id))) {
+    return res.status(400).json({ error: 'A valid patient_id is required' });
+  }
+
+  const patientExists = await pool.query('SELECT id FROM patients WHERE id = $1', [patient_id]);
+  if (patientExists.rows.length === 0) {
+    return res.status(404).json({ error: 'Patient not found' });
   }
 
   const client = await pool.connect();
@@ -66,6 +72,6 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), async (req, res) =>
   } finally {
     client.release();
   }
-});
+}));
 
 module.exports = router;
