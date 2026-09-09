@@ -7,10 +7,17 @@ import ProgressPhotos from '../../components/ProgressPhotos';
 import PurchaseScanner from '../../components/PurchaseScanner';
 import VisitHistoryList from '../../components/VisitHistoryList';
 
+const LAB_STATUS_PLAIN = {
+  NORMAL_BY_LAB: "Within your lab's reference range",
+  LOW: "Below your lab's reference range",
+  HIGH: "Above your lab's reference range",
+};
+
 export default function MyCare() {
   const { user, logout } = useAuth();
   const [data, setData] = useState(null);
   const [purchases, setPurchases] = useState([]);
+  const [labData, setLabData] = useState(null);
   const [error, setError] = useState('');
 
   async function loadPurchases() {
@@ -21,9 +28,14 @@ export default function MyCare() {
     }
   }
 
+  function loadLabs() {
+    apiFetch(`/labs/${user.id}`).then(setLabData).catch((err) => setError(err.message));
+  }
+
   useEffect(() => {
     apiFetch(`/patients/${user.id}`).then(setData).catch((err) => setError(err.message));
     loadPurchases();
+    loadLabs();
   }, []);
 
   return (
@@ -63,7 +75,28 @@ export default function MyCare() {
 
       <h3 className="section-title">Scan a lab result</h3>
       <p className="muted">See if a product you're taking looks like it's helping your levels.</p>
-      <LabScanner />
+      <LabScanner onScanned={loadLabs} />
+
+      <h3 className="section-title">Your lab result history</h3>
+      {(!labData || labData.results.length === 0) && <p className="muted">No lab results on file yet.</p>}
+      {labData?.results.map((lab) => (
+        <div key={lab.id} className="visit-card">
+          <div className="visit-card__date">{new Date(lab.scanned_at).toLocaleDateString()}</div>
+          {lab.markers.map((m) => (
+            <div key={m.id} className="lab-clinical-card">
+              <div className="lab-clinical-card__head">
+                <strong>{m.label}</strong>
+                <span className={`badge badge-severity-${(m.lab_status || 'unknown').toLowerCase()}`}>
+                  {m.lab_status ? LAB_STATUS_PLAIN[m.lab_status] : (m.requires_review ? 'Flagged for your pharmacist to review' : 'No reference range on file')}
+                </span>
+              </div>
+              <div className="marker-card__value">{m.result_text || `${m.value} ${m.unit}`}</div>
+              <p className="lab-clinical-card__section muted">{m.insight}</p>
+            </div>
+          ))}
+        </div>
+      ))}
+      {labData?.disclaimer && <p className="disclaimer">{labData.disclaimer}</p>}
 
       <h3 className="section-title">Scan a product</h3>
       <p className="muted">Add something you're taking to your purchase history.</p>

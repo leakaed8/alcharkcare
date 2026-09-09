@@ -417,6 +417,75 @@ table.table tbody tr:last-child td {
   color: #475569;
 }
 
+.badge-severity-critical, .badge-severity-deficient {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-severity-high, .badge-severity-low {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.badge-severity-borderline, .badge-severity-review {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.badge-severity-adequate, .badge-severity-normal, .badge-severity-normal_by_lab {
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
+.badge-severity-unknown {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.lab-clinical-card {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.lab-clinical-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lab-clinical-card__statuses {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.lab-clinical-card__section {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.safety-flag {
+  background: #fff7ed;
+  color: #9a3412;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.recommendation-box {
+  background: #f0fdfa;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
 /* Scan / upload flows */
 .scan-box {
   border: 2px dashed var(--teal-200);
