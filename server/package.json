@@ -8,7 +8,9 @@
     "dev": "nodemon index.js",
     "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
-    "set-password": "node db/set-password.js"
+    "seed:lab-clinical": "node db/seedLabClinical.js",
+    "set-password": "node db/set-password.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
