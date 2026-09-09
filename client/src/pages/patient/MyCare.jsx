@@ -5,6 +5,7 @@ import CarePlanList from '../../components/CarePlanList';
 import LabScanner from '../../components/LabScanner';
 import ProgressPhotos from '../../components/ProgressPhotos';
 import PurchaseScanner from '../../components/PurchaseScanner';
+import Shop from '../../components/Shop';
 import VisitHistoryList from '../../components/VisitHistoryList';
 
 const LAB_STATUS_PLAIN = {
@@ -97,6 +98,10 @@ export default function MyCare() {
         </div>
       ))}
       {labData?.disclaimer && <p className="disclaimer">{labData.disclaimer}</p>}
+
+      <h3 className="section-title">Shop</h3>
+      <p className="muted">Order ahead and pay in store when you pick it up.</p>
+      <Shop patientId={user.id} />
 
       <h3 className="section-title">Scan a product</h3>
       <p className="muted">Add something you're taking to your purchase history.</p>
