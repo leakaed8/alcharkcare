@@ -1,31 +1,29 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiFetch } from '../api/client';
+import { getCart, setCart as persistCart } from '../lib/cart';
+import AvailabilityBadge from './patient/AvailabilityBadge';
 
 const ORDER_STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', fulfilled: 'Ready/fulfilled', cancelled: 'Cancelled' };
 
 // Order-ahead shop: browse the active catalog, build a cart, and submit it
 // as an order. No online payment -- the order is a reservation the patient
 // pays for in store on pickup (payment_method = cash_on_pickup, set
-// server-side). The cart lives only in this component's state -- it is not
-// a database "cart"; the submitted order IS the persisted cart.
+// server-side). The cart lives in localStorage (see lib/cart.js) rather
+// than a database table, shared with the product detail page's "Add to
+// cart" -- the submitted order IS the persisted cart.
 export default function Shop({ patientId }) {
   const [catalog, setCatalog] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [cart, setCart] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`alcrm_cart_${patientId}`)) || {};
-    } catch {
-      return {};
-    }
-  });
+  const [cart, setCart] = useState(() => getCart(patientId));
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(`alcrm_cart_${patientId}`, JSON.stringify(cart));
+    persistCart(patientId, cart);
   }, [cart, patientId]);
 
   function loadOrders() {
@@ -94,8 +92,14 @@ export default function Shop({ patientId }) {
                 {p.image_url && <img src={p.image_url} alt={p.name} />}
                 <strong>{p.name}</strong>
                 {p.price != null && <span className="muted">${p.price}</span>}
+                <AvailabilityBadge availability={p.availability} />
                 {p.reasons.map((r, i) => <p key={i} className="muted" style={{ fontSize: 12 }}>{r}</p>)}
-                <button className="btn btn-sm btn-secondary" onClick={() => addToCart(p)}>Add to cart</button>
+                <div className="row-actions">
+                  <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${p.id}`}>View</Link>
+                  {p.availability?.level === 'green' || p.availability?.level === 'orange' ? (
+                    <button className="btn btn-sm btn-primary" onClick={() => addToCart(p)}>Add to cart</button>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
@@ -108,9 +112,16 @@ export default function Shop({ patientId }) {
           <div key={p.id} className="product-card">
             {p.image_url && <img src={p.image_url} alt={p.name} />}
             <strong>{p.name}</strong>
+            {p.brand && <span className="muted">{p.brand}</span>}
             <span className="muted">{p.category}</span>
             {p.price != null && <span>${p.price}</span>}
-            <button className="btn btn-sm btn-secondary" onClick={() => addToCart(p)}>Add to cart</button>
+            <AvailabilityBadge availability={p.availability} />
+            <div className="row-actions">
+              <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${p.id}`}>View</Link>
+              {p.availability?.level === 'green' || p.availability?.level === 'orange' ? (
+                <button className="btn btn-sm btn-primary" onClick={() => addToCart(p)}>Add to cart</button>
+              ) : null}
+            </div>
           </div>
         ))}
         {catalog.length === 0 && <p className="muted">Nothing in the shop yet.</p>}

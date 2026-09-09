@@ -24,6 +24,7 @@ router.get('/:patientId', verifyToken, asyncHandler(async (req, res) => {
   if (!canView(req, patientId)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
+  const isStaff = req.user.role === 'staff' || req.user.role === 'admin';
 
   const { rows: plans } = await pool.query(
     `SELECT id, title, goal, status, start_date, target_end_date, created_at, updated_at
@@ -33,12 +34,16 @@ router.get('/:patientId', verifyToken, asyncHandler(async (req, res) => {
 
   const withVisits = [];
   for (const plan of plans) {
+    // `assessment` is the pharmacist's internal clinical judgment -- never
+    // sent to the patient, even though this component doesn't currently
+    // render it (the raw response is still inspectable client-side).
     const { rows: visits } = await pool.query(
-      `SELECT v.id, v.visit_date, v.complaint, v.assessment, v.lifestyle_advice,
+      `SELECT v.id, v.visit_date, v.complaint, v.patient_summary, v.lifestyle_advice,
+              ${isStaff ? 'v.assessment,' : ''}
               COALESCE(
                 json_agg(
-                  json_build_object('product_name', p.name, 'dosing_notes', vp.dosing_notes)
-                ) FILTER (WHERE vp.id IS NOT NULL), '[]'
+                  json_build_object('product_name', p.name, 'dosing_notes', vp.dosing_notes, 'status', vp.status)
+                ) FILTER (WHERE vp.id IS NOT NULL AND (vp.patient_visible OR $2)), '[]'
               ) AS products
        FROM visits v
        LEFT JOIN visit_products vp ON vp.visit_id = v.id
@@ -46,7 +51,7 @@ router.get('/:patientId', verifyToken, asyncHandler(async (req, res) => {
        WHERE v.care_plan_id = $1
        GROUP BY v.id
        ORDER BY v.visit_date ASC`,
-      [plan.id]
+      [plan.id, isStaff]
     );
     withVisits.push({ ...plan, visits });
   }
