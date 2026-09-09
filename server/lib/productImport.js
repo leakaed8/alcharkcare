@@ -4,6 +4,7 @@ const ExcelJS = require('exceljs');
 // massage their existing spreadsheet to match our exact column names.
 const HEADER_SYNONYMS = {
   name: ['name', 'product name', 'product', 'item', 'item name'],
+  brand: ['brand', 'manufacturer', 'maker'],
   category: ['category', 'type'],
   sku: ['sku', 'code', 'item code', 'product code'],
   price: ['price', 'unit price', 'cost', 'sale price'],

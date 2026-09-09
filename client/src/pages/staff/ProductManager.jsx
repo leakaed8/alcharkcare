@@ -68,12 +68,12 @@ function ImportPanel({ onImported }) {
         <div className="table-wrap mt-3">
           <table className="table">
             <thead>
-              <tr><th>Row</th><th>Name</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th></tr>
+              <tr><th>Row</th><th>Name</th><th>Brand</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th></tr>
             </thead>
             <tbody>
               {preview.rows.map((r) => (
                 <tr key={r.row}>
-                  <td>{r.row}</td><td>{r.name}</td><td>{r.sku || '—'}</td><td>{r.category || '—'}</td><td>{r.price ?? '—'}</td><td>{r.stock_qty ?? '—'}</td>
+                  <td>{r.row}</td><td>{r.name}</td><td>{r.brand || '—'}</td><td>{r.sku || '—'}</td><td>{r.category || '—'}</td><td>{r.price ?? '—'}</td><td>{r.stock_qty ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

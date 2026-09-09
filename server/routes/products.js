@@ -193,6 +193,7 @@ router.post('/import', verifyToken, requireRole('staff', 'admin'), spreadsheetUp
       results.skipped.push({ row: row._row, reason: 'Missing product name' });
       continue;
     }
+    const brand = row.brand ? String(row.brand).trim() : null;
     const sku = row.sku != null && String(row.sku).trim() ? String(row.sku).trim() : null;
     const category = row.category ? String(row.category).trim() : null;
     const price = row.price === '' || row.price == null ? null : Number(row.price);
@@ -204,7 +205,7 @@ router.post('/import', verifyToken, requireRole('staff', 'admin'), spreadsheetUp
       : null;
 
     if (preview) {
-      previewRows.push({ row: row._row, name, sku, category, price, stock_qty: stockQty, duration_days: durationDays, description, allergens });
+      previewRows.push({ row: row._row, name, brand, sku, category, price, stock_qty: stockQty, duration_days: durationDays, description, allergens });
       continue;
     }
 
@@ -212,11 +213,11 @@ router.post('/import', verifyToken, requireRole('staff', 'admin'), spreadsheetUp
       const existing = await pool.query('SELECT id FROM products WHERE sku = $1', [sku]);
       if (existing.rows.length > 0) {
         await pool.query(
-          `UPDATE products SET name = $1, category = COALESCE($2, category), price = COALESCE($3, price),
-             stock_qty = COALESCE($4, stock_qty), duration_days = COALESCE($5, duration_days),
-             description = COALESCE($6, description), allergens = COALESCE($7, allergens)
-           WHERE id = $8`,
-          [name, category, price, stockQty, durationDays, description, allergens, existing.rows[0].id]
+          `UPDATE products SET name = $1, brand = COALESCE($2, brand), category = COALESCE($3, category), price = COALESCE($4, price),
+             stock_qty = COALESCE($5, stock_qty), duration_days = COALESCE($6, duration_days),
+             description = COALESCE($7, description), allergens = COALESCE($8, allergens)
+           WHERE id = $9`,
+          [name, brand, category, price, stockQty, durationDays, description, allergens, existing.rows[0].id]
         );
         results.updated += 1;
         continue;
@@ -224,9 +225,9 @@ router.post('/import', verifyToken, requireRole('staff', 'admin'), spreadsheetUp
     }
 
     await pool.query(
-      `INSERT INTO products (name, category, sku, price, stock_qty, duration_days, description, allergens)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [name, category, sku, price, stockQty, durationDays, description, allergens]
+      `INSERT INTO products (name, brand, category, sku, price, stock_qty, duration_days, description, allergens)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [name, brand, category, sku, price, stockQty, durationDays, description, allergens]
     );
     results.created += 1;
   }
