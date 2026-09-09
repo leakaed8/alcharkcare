@@ -126,7 +126,7 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
 
   const visitsResult = await pool.query(
     `SELECT v.id, v.visit_date, v.complaint, v.assessment, v.lifestyle_advice,
-            v.photo_urls, v.next_followup_date, s.name AS staff_name,
+            v.photo_urls, v.next_followup_date, v.care_plan_id, s.name AS staff_name,
             COALESCE(
               json_agg(
                 json_build_object(

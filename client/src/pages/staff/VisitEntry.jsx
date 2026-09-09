@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../../api/client';
+import CarePlanList from '../../components/CarePlanList';
 import PatientPicker from '../../components/PatientPicker';
 import ProductPicker from '../../components/ProductPicker';
+import ProgressPhotos from '../../components/ProgressPhotos';
 import VisitHistoryList from '../../components/VisitHistoryList';
 
 const SKIN_TYPES = ['normal', 'oily', 'dry', 'combination', 'sensitive'];
@@ -17,12 +19,15 @@ export default function VisitEntry() {
   const [skinType, setSkinType] = useState('');
   const [allergies, setAllergies] = useState('');
 
+  const [carePlanId, setCarePlanId] = useState('');
+  const [activePlans, setActivePlans] = useState([]);
+
   const [complaint, setComplaint] = useState('');
   const [assessment, setAssessment] = useState('');
   const [lifestyleAdvice, setLifestyleAdvice] = useState('');
   const [nextFollowupDate, setNextFollowupDate] = useState('');
   const [products, setProducts] = useState([]);
-  const [selectedProductIds, setSelectedProductIds] = useState([]);
+  const [productItems, setProductItems] = useState([]); // [{ product_id, dosing_notes }]
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
@@ -52,6 +57,10 @@ export default function VisitEntry() {
     setProducts((prev) => [...prev, product].sort((a, b) => a.name.localeCompare(b.name)));
   }
 
+  function handlePlansLoaded(plans) {
+    setActivePlans(plans.filter((p) => p.status === 'active'));
+  }
+
   function changePatient() {
     setPatientId(null);
     setPatientData(null);
@@ -79,11 +88,12 @@ export default function VisitEntry() {
         method: 'POST',
         body: JSON.stringify({
           patient_id: patientId,
+          care_plan_id: carePlanId || null,
           complaint,
           assessment,
           lifestyle_advice: lifestyleAdvice,
           next_followup_date: nextFollowupDate || null,
-          products: selectedProductIds.map((product_id) => ({ product_id })),
+          products: productItems,
         }),
       });
       setSuccess('Visit logged.');
@@ -132,6 +142,9 @@ export default function VisitEntry() {
       <h3 className="section-title">History</h3>
       <VisitHistoryList visits={visits} />
 
+      <h3 className="section-title">Care plans</h3>
+      <CarePlanList patientId={patientId} canManage onPlansLoaded={handlePlansLoaded} />
+
       <h3 className="section-title">Patient profile</h3>
       <div className="card mb-5">
         <div className="form-field">
@@ -155,6 +168,15 @@ export default function VisitEntry() {
 
       <h3 className="section-title">Treatment session</h3>
       <form onSubmit={handleSubmit} className="card">
+        {activePlans.length > 0 && (
+          <div className="form-field">
+            <label className="field-label" htmlFor="carePlan">Part of care plan</label>
+            <select id="carePlan" className="input" value={carePlanId} onChange={(e) => setCarePlanId(e.target.value)}>
+              <option value="">No plan</option>
+              {activePlans.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+          </div>
+        )}
         <div className="form-field">
           <label className="field-label" htmlFor="complaint">Complaint</label>
           <textarea id="complaint" className="textarea" value={complaint} onChange={(e) => setComplaint(e.target.value)} />
@@ -187,8 +209,8 @@ export default function VisitEntry() {
           <legend>Products / supplements used</legend>
           <ProductPicker
             products={products}
-            selectedIds={selectedProductIds}
-            onChange={setSelectedProductIds}
+            items={productItems}
+            onChange={setProductItems}
             onProductCreated={handleProductCreated}
           />
         </fieldset>
@@ -198,6 +220,9 @@ export default function VisitEntry() {
           Save visit
         </button>
       </form>
+
+      <h3 className="section-title">Progress photos</h3>
+      <ProgressPhotos patientId={patientId} />
     </div>
   );
 }

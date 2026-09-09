@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { apiFetch } from '../../api/client';
+import CarePlanList from '../../components/CarePlanList';
 import LabScanner from '../../components/LabScanner';
+import ProgressPhotos from '../../components/ProgressPhotos';
 import PurchaseScanner from '../../components/PurchaseScanner';
 import VisitHistoryList from '../../components/VisitHistoryList';
 
@@ -38,8 +40,14 @@ export default function MyCare() {
 
       {error && <p className="alert alert-error">{error}</p>}
 
+      <h3 className="section-title">Care plans</h3>
+      <CarePlanList patientId={user.id} canManage={false} />
+
       <h3 className="section-title">Visit history</h3>
       {!data ? <p className="muted">Loading…</p> : <VisitHistoryList visits={data.visits} />}
+
+      <h3 className="section-title">Progress photos</h3>
+      <ProgressPhotos patientId={user.id} />
 
       <h3 className="section-title">Follow-ups</h3>
       {data && data.followups.length === 0 && <p className="muted">No follow-ups logged.</p>}

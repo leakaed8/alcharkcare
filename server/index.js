@@ -11,6 +11,8 @@ const productRoutes = require('./routes/products');
 const labRoutes = require('./routes/labs');
 const purchaseRoutes = require('./routes/purchases');
 const managerRoutes = require('./routes/manager');
+const carePlanRoutes = require('./routes/carePlans');
+const photoRoutes = require('./routes/photos');
 
 // Last-resort net: a third-party lib (e.g. the OCR worker) throwing outside
 // any promise chain would otherwise crash the whole process for every user
@@ -32,6 +34,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/labs', labRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/manager', managerRoutes);
+app.use('/api/care-plans', carePlanRoutes);
+app.use('/api/photos', photoRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
