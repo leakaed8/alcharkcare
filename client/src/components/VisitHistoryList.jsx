@@ -9,7 +9,16 @@ export default function VisitHistoryList({ visits }) {
       <p className="visit-card__row"><b>Assessment:</b> {v.assessment || '—'}</p>
       <p className="visit-card__row"><b>Lifestyle advice:</b> {v.lifestyle_advice || '—'}</p>
       {v.products.length > 0 && (
-        <p className="visit-card__row"><b>Products:</b> {v.products.map((p) => p.product_name).join(', ')}</p>
+        <p className="visit-card__row">
+          <b>Products:</b>{' '}
+          {v.products.map((p, i) => (
+            <span key={i}>
+              {i > 0 && ', '}
+              {p.product_name}
+              {p.dosing_notes && <span className="muted"> ({p.dosing_notes})</span>}
+            </span>
+          ))}
+        </p>
       )}
       {v.next_followup_date && (
         <p className="visit-card__row"><b>Next follow-up:</b> {v.next_followup_date}</p>

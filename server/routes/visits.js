@@ -6,11 +6,12 @@ const asyncHandler = require('../lib/asyncHandler');
 const router = express.Router();
 
 // Log a visit. Staff only.
-// Body: { patient_id, complaint, assessment, lifestyle_advice, next_followup_date,
-//         photo_urls, products: [{ product_id, is_supplement, dosing_notes }] }
+// Body: { patient_id, care_plan_id, complaint, assessment, lifestyle_advice,
+//         next_followup_date, photo_urls, products: [{ product_id, is_supplement, dosing_notes }] }
 router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const {
     patient_id,
+    care_plan_id,
     complaint,
     assessment,
     lifestyle_advice,
@@ -21,6 +22,9 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async 
 
   if (!patient_id || !/^\d+$/.test(String(patient_id))) {
     return res.status(400).json({ error: 'A valid patient_id is required' });
+  }
+  if (care_plan_id && !/^\d+$/.test(String(care_plan_id))) {
+    return res.status(400).json({ error: 'Invalid care_plan_id' });
   }
 
   const patientExists = await pool.query('SELECT id FROM patients WHERE id = $1', [patient_id]);
@@ -33,12 +37,13 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async 
     await client.query('BEGIN');
 
     const visitResult = await client.query(
-      `INSERT INTO visits (patient_id, staff_id, complaint, assessment, lifestyle_advice, photo_urls, next_followup_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO visits (patient_id, staff_id, care_plan_id, complaint, assessment, lifestyle_advice, photo_urls, next_followup_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, visit_date`,
       [
         patient_id,
         req.user.id,
+        care_plan_id || null,
         complaint || null,
         assessment || null,
         lifestyle_advice || null,

@@ -1,25 +1,37 @@
 import { useState } from 'react';
 import { apiFetch } from '../api/client';
 
-// Multi-select product/supplement picker. Typing filters the catalog;
-// if nothing matches, an inline "create new" option adds it to the
-// catalog (POST /api/products) and selects it immediately.
-export default function ProductPicker({ products, selectedIds, onChange, onProductCreated }) {
+// Multi-select product/supplement picker with a per-product "how to use it"
+// instructions field. Typing filters the catalog; if nothing matches, an
+// inline "create new" option adds it to the catalog (POST /api/products)
+// and selects it immediately.
+//
+// `items` is [{ product_id, dosing_notes }] rather than a plain id array so
+// each selected product can carry its own instructions.
+export default function ProductPicker({ products, items, onChange, onProductCreated }) {
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const selected = products.filter((p) => selectedIds.includes(p.id));
+  const selectedIds = items.map((i) => i.product_id);
   const q = query.trim().toLowerCase();
   const matches = q ? products.filter((p) => p.name.toLowerCase().includes(q)) : products;
   const exactMatch = products.some((p) => p.name.toLowerCase() === q);
 
   function toggle(id) {
-    onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);
+    if (selectedIds.includes(id)) {
+      onChange(items.filter((i) => i.product_id !== id));
+    } else {
+      onChange([...items, { product_id: id, dosing_notes: '' }]);
+    }
   }
 
   function remove(id) {
-    onChange(selectedIds.filter((x) => x !== id));
+    onChange(items.filter((i) => i.product_id !== id));
+  }
+
+  function updateNotes(id, dosing_notes) {
+    onChange(items.map((i) => (i.product_id === id ? { ...i, dosing_notes } : i)));
   }
 
   async function createAndSelect() {
@@ -28,7 +40,7 @@ export default function ProductPicker({ products, selectedIds, onChange, onProdu
     try {
       const product = await apiFetch('/products', { method: 'POST', body: JSON.stringify({ name: query.trim() }) });
       onProductCreated(product);
-      onChange([...selectedIds, product.id]);
+      onChange([...items, { product_id: product.id, dosing_notes: '' }]);
       setQuery('');
     } catch (err) {
       setError(err.message);
@@ -39,16 +51,34 @@ export default function ProductPicker({ products, selectedIds, onChange, onProdu
 
   return (
     <div>
-      {selected.length > 0 && (
-        <div className="row-actions mb-3">
-          {selected.map((p) => (
-            <span key={p.id} className="badge badge-status-upcoming">
-              {p.name}{' '}
-              <button type="button" className="chip-remove" onClick={() => remove(p.id)} aria-label={`Remove ${p.name}`}>
-                ×
-              </button>
-            </span>
-          ))}
+      {items.length > 0 && (
+        <div className="mb-3">
+          {items.map((item) => {
+            const product = products.find((p) => p.id === item.product_id);
+            return (
+              <div key={item.product_id} className="dosing-row">
+                <div className="row-actions">
+                  <span className="badge badge-status-upcoming">
+                    {product?.name || `#${item.product_id}`}{' '}
+                    <button
+                      type="button"
+                      className="chip-remove"
+                      onClick={() => remove(item.product_id)}
+                      aria-label={`Remove ${product?.name}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                </div>
+                <input
+                  className="input input-sm"
+                  placeholder="How to use it (e.g. twice daily after cleansing)"
+                  value={item.dosing_notes}
+                  onChange={(e) => updateNotes(item.product_id, e.target.value)}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiFetch } from '../../api/client';
+import CarePlanList from '../../components/CarePlanList';
+import ProgressPhotos from '../../components/ProgressPhotos';
 import VisitHistoryList from '../../components/VisitHistoryList';
 
 const FLAG_LABELS = { low: 'Low', normal: 'Normal', high: 'High', unknown: 'Unclear' };
@@ -48,8 +50,14 @@ export default function PatientTimeline() {
         </div>
       </div>
 
+      <h3 className="section-title">Care plans</h3>
+      <CarePlanList patientId={id} canManage />
+
       <h3 className="section-title">Visit history</h3>
       <VisitHistoryList visits={visits} />
+
+      <h3 className="section-title">Progress photos</h3>
+      <ProgressPhotos patientId={id} />
 
       <h3 className="section-title">Purchase history</h3>
       {purchases.length === 0 && <p className="muted">No purchases logged.</p>}
