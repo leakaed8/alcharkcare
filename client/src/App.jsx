@@ -8,6 +8,7 @@ import InvoiceScan from './pages/staff/InvoiceScan';
 import ManagerDashboard from './pages/staff/ManagerDashboard';
 import PatientSearch from './pages/staff/PatientSearch';
 import PatientTimeline from './pages/staff/PatientTimeline';
+import ProductManager from './pages/staff/ProductManager';
 import VisitEntry from './pages/staff/VisitEntry';
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="patients/:id/scan-invoice" element={<InvoiceScan />} />
         <Route path="visits/new" element={<VisitEntry />} />
         <Route path="followups" element={<FollowupDashboard />} />
+        <Route path="products" element={<ProductManager />} />
         <Route
           path="manager"
           element={
