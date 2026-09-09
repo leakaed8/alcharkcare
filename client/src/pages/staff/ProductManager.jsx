@@ -1,7 +1,125 @@
-import { useEffect, useState } from 'react';
-import { apiFetch } from '../../api/client';
+import { useEffect, useRef, useState } from 'react';
+import { apiFetch, apiUpload } from '../../api/client';
 
-const EMPTY_FORM = { name: '', category: '', sku: '', price: '', stock_qty: '', duration_days: '', description: '' };
+const EMPTY_FORM = { name: '', category: '', sku: '', price: '', stock_qty: '', duration_days: '', description: '', allergens: '', is_active: true };
+
+function ImportPanel({ onImported }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
+  const inputRef = useRef(null);
+
+  async function handlePreview(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    setFile(f);
+    setError('');
+    setResult(null);
+    setBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', f);
+      const data = await apiUpload('/products/import?preview=true', formData);
+      setPreview(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCommit() {
+    setBusy(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const data = await apiUpload('/products/import', formData);
+      setResult(data);
+      setPreview(null);
+      setFile(null);
+      if (inputRef.current) inputRef.current.value = '';
+      onImported();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card mb-5">
+      <p className="field-label">Import products from Excel (.xlsx)</p>
+      <p className="muted">
+        Expects columns like Name, Category, SKU, Price, Stock, Duration (days), Description, Allergens -- header
+        names are matched flexibly. Existing products are matched and updated by SKU.
+      </p>
+      <input ref={inputRef} type="file" accept=".xlsx" onChange={handlePreview} disabled={busy} />
+      {error && <p className="alert alert-error">{error}</p>}
+      {result && (
+        <p className="alert alert-success">
+          Imported: {result.created} created, {result.updated} updated
+          {result.skipped?.length > 0 && `, ${result.skipped.length} skipped`}.
+        </p>
+      )}
+      {preview && (
+        <div className="table-wrap mt-3">
+          <table className="table">
+            <thead>
+              <tr><th>Row</th><th>Name</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th></tr>
+            </thead>
+            <tbody>
+              {preview.rows.map((r) => (
+                <tr key={r.row}>
+                  <td>{r.row}</td><td>{r.name}</td><td>{r.sku || '—'}</td><td>{r.category || '—'}</td><td>{r.price ?? '—'}</td><td>{r.stock_qty ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {preview.unmatchedHeaders?.length > 0 && (
+            <p className="muted">Unrecognized columns (ignored): {preview.unmatchedHeaders.join(', ')}</p>
+          )}
+          <button className="btn btn-primary mt-2" onClick={handleCommit} disabled={busy}>
+            Import {preview.rows.length} product{preview.rows.length === 1 ? '' : 's'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImageUpload({ product, onUploaded }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setBusy(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const updated = await apiUpload(`/products/${product.id}/image`, formData);
+      onUploaded(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+      e.target.value = '';
+    }
+  }
+
+  return (
+    <div>
+      {product.image_url && <img src={product.image_url} alt={product.name} style={{ width: 48, height: 48, borderRadius: 6, objectFit: 'cover' }} />}
+      <input type="file" accept="image/*" onChange={handleFile} disabled={busy} style={{ maxWidth: 140 }} />
+      {error && <span className="alert alert-error">{error}</span>}
+    </div>
+  );
+}
 
 export default function ProductManager() {
   const [products, setProducts] = useState([]);
@@ -32,6 +150,8 @@ export default function ProductManager() {
       stock_qty: p.stock_qty ?? '',
       duration_days: p.duration_days ?? '',
       description: p.description || '',
+      allergens: (p.allergens || []).join(', '),
+      is_active: p.is_active !== false,
     });
     setError('');
     setSuccess('');
@@ -62,14 +182,21 @@ export default function ProductManager() {
     }
   }
 
+  function handleImageUploaded(updated) {
+    setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+  }
+
   return (
     <div>
       <div className="page-header">
         <h2>Products</h2>
       </div>
       <p className="muted">
-        Anything added here becomes available to pick from on the "New visit" form's product/supplement list.
+        Anything added here becomes available to pick from on the "New visit" form's product/supplement list, and --
+        when active -- in the patient-facing shop.
       </p>
+
+      <ImportPanel onImported={load} />
 
       <form onSubmit={handleSubmit} className="card mb-5">
         <p className="field-label">{editingId ? 'Edit product' : 'Add a product'}</p>
@@ -101,6 +228,13 @@ export default function ProductManager() {
           <label className="field-label" htmlFor="p-description">Description</label>
           <textarea id="p-description" className="textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-allergens">Allergens (comma-separated)</label>
+          <input id="p-allergens" className="input" value={form.allergens} onChange={(e) => setForm({ ...form, allergens: e.target.value })} placeholder="e.g. fragrance, nuts" />
+        </div>
+        <label className="field-label">
+          <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Visible in the patient-facing shop
+        </label>
 
         {error && <p className="alert alert-error">{error}</p>}
         {success && <p className="alert alert-success">{success}</p>}
@@ -117,29 +251,33 @@ export default function ProductManager() {
         <table className="table">
           <thead>
             <tr>
+              <th>Photo</th>
               <th>Name</th>
               <th>Category</th>
               <th>SKU</th>
               <th>Price</th>
               <th>Stock</th>
+              <th>Shop</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {products.map((p) => (
               <tr key={p.id}>
+                <td><ImageUpload product={p} onUploaded={handleImageUploaded} /></td>
                 <td>{p.name}</td>
                 <td>{p.category || '—'}</td>
                 <td>{p.sku || '—'}</td>
                 <td>{p.price != null ? `$${p.price}` : '—'}</td>
                 <td>{p.stock_qty ?? '—'}</td>
+                <td>{p.is_active !== false ? 'Visible' : 'Hidden'}</td>
                 <td>
                   <button className="btn btn-sm btn-secondary" onClick={() => startEdit(p)}>Edit</button>
                 </td>
               </tr>
             ))}
             {products.length === 0 && (
-              <tr><td colSpan={6} className="muted">No products yet.</td></tr>
+              <tr><td colSpan={8} className="muted">No products yet.</td></tr>
             )}
           </tbody>
         </table>
