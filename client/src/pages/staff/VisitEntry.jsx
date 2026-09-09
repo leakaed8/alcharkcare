@@ -50,51 +50,68 @@ export default function VisitEntry() {
   }
 
   return (
-    <div style={{ maxWidth: 500 }}>
+    <div className="page-narrow">
       <h2>New visit</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <label>
-          Patient ID
-          <input value={patientId} onChange={(e) => setPatientId(e.target.value)} required />
-        </label>
-        <label>
-          Complaint
-          <textarea value={complaint} onChange={(e) => setComplaint(e.target.value)} />
-        </label>
-        <label>
-          Assessment
-          <textarea value={assessment} onChange={(e) => setAssessment(e.target.value)} />
-        </label>
-        <label>
-          Lifestyle advice
-          <textarea value={lifestyleAdvice} onChange={(e) => setLifestyleAdvice(e.target.value)} />
-        </label>
-        <label>
-          Next follow-up date
+      <form onSubmit={handleSubmit} className="card">
+        <div className="form-field">
+          <label className="field-label" htmlFor="patientId">Patient ID</label>
           <input
+            id="patientId"
+            className="input"
+            value={patientId}
+            onChange={(e) => setPatientId(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="complaint">Complaint</label>
+          <textarea id="complaint" className="textarea" value={complaint} onChange={(e) => setComplaint(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="assessment">Assessment</label>
+          <textarea id="assessment" className="textarea" value={assessment} onChange={(e) => setAssessment(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="lifestyleAdvice">Lifestyle advice</label>
+          <textarea
+            id="lifestyleAdvice"
+            className="textarea"
+            value={lifestyleAdvice}
+            onChange={(e) => setLifestyleAdvice(e.target.value)}
+          />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="nextFollowupDate">Next follow-up date</label>
+          <input
+            id="nextFollowupDate"
+            className="input"
             type="date"
             value={nextFollowupDate}
             onChange={(e) => setNextFollowupDate(e.target.value)}
           />
-        </label>
+        </div>
 
-        <fieldset>
+        <fieldset className="field-fieldset">
           <legend>Products / supplements used</legend>
-          {products.map((p) => (
-            <label key={p.id} style={{ display: 'block' }}>
-              <input
-                type="checkbox"
-                checked={selectedProductIds.includes(p.id)}
-                onChange={() => toggleProduct(p.id)}
-              />
-              {p.name}
-            </label>
-          ))}
+          <div className="checkbox-grid">
+            {products.map((p) => (
+              <label key={p.id} className="checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={selectedProductIds.includes(p.id)}
+                  onChange={() => toggleProduct(p.id)}
+                />
+                {p.name}
+              </label>
+            ))}
+          </div>
         </fieldset>
 
-        {error && <p style={{ color: 'crimson' }}>{error}</p>}
-        {success && <p style={{ color: 'green' }}>{success}</p>}
-        <button type="submit">Save visit</button>
+        {error && <p className="alert alert-error">{error}</p>}
+        {success && <p className="alert alert-success">{success}</p>}
+        <button type="submit" className="btn btn-primary btn-block">
+          Save visit
+        </button>
       </form>
     </div>
   );

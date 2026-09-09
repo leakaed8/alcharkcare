@@ -6,10 +6,15 @@ export default function MyCare() {
   const { user, logout } = useAuth();
 
   return (
-    <div style={{ maxWidth: 500, margin: '60px auto', fontFamily: 'sans-serif' }}>
-      <h1>Welcome, {user?.name}</h1>
-      <p>Your care timeline, notifications, and shop are coming soon.</p>
-      <button onClick={logout}>Log out</button>
+    <div className="patient-shell">
+      <div className="patient-card">
+        <div className="patient-card__mark">AC</div>
+        <h1>Welcome, {user?.name}</h1>
+        <p>Your care timeline, notifications, and shop are coming soon.</p>
+        <button className="btn btn-secondary" onClick={logout}>
+          Log out
+        </button>
+      </div>
     </div>
   );
 }

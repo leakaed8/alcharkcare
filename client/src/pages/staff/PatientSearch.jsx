@@ -27,41 +27,61 @@ export default function PatientSearch() {
 
   return (
     <div>
-      <h2>Patients</h2>
-      <form onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
+      <div className="page-header">
+        <h2>Patients</h2>
+      </div>
+
+      <form onSubmit={handleSubmit} className="search-bar">
         <input
+          className="input"
           placeholder="Search by name or phone"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button type="submit">Search</button>
+        <button type="submit" className="btn btn-primary">
+          Search
+        </button>
       </form>
 
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {error && <p className="alert alert-error">{error}</p>}
 
-      <table cellPadding={6} style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <thead>
-          <tr style={{ textAlign: 'left', borderBottom: '1px solid #ddd' }}>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Tier</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {patients.map((p) => (
-            <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td>{p.name}</td>
-              <td>{p.phone}</td>
-              <td>{p.loyalty_tier}</td>
-              <td>
-                <Link to={`/staff/patients/${p.id}`}>View timeline</Link>{' '}
-                | <Link to={`/staff/visits/new?patientId=${p.id}`}>New visit</Link>
-              </td>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Tier</th>
+              <th></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {patients.map((p) => (
+              <tr key={p.id}>
+                <td>{p.name}</td>
+                <td>{p.phone}</td>
+                <td>
+                  <span className={`badge badge-${p.loyalty_tier}`}>{p.loyalty_tier}</span>
+                </td>
+                <td>
+                  <div className="row-actions">
+                    <Link to={`/staff/patients/${p.id}`}>View timeline</Link>
+                    <span className="muted">|</span>
+                    <Link to={`/staff/visits/new?patientId=${p.id}`}>New visit</Link>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {patients.length === 0 && (
+              <tr>
+                <td colSpan={4} className="muted">
+                  No patients found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
