@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch, apiUpload } from '../../api/client';
 
-const EMPTY_FORM = { name: '', category: '', sku: '', price: '', stock_qty: '', duration_days: '', description: '', allergens: '', is_active: true };
+const EMPTY_FORM = { name: '', brand: '', category: '', sku: '', price: '', stock_qty: '', duration_days: '', description: '', allergens: '', is_active: true };
 
 function ImportPanel({ onImported }) {
   const [file, setFile] = useState(null);
@@ -144,6 +144,7 @@ export default function ProductManager() {
     setEditingId(p.id);
     setForm({
       name: p.name || '',
+      brand: p.brand || '',
       category: p.category || '',
       sku: p.sku || '',
       price: p.price ?? '',
@@ -203,6 +204,10 @@ export default function ProductManager() {
         <div className="form-field">
           <label className="field-label" htmlFor="p-name">Name</label>
           <input id="p-name" className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-brand">Brand</label>
+          <input id="p-brand" className="input" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="e.g. CeraVe, Mason Naturals" />
         </div>
         <div className="form-field">
           <label className="field-label" htmlFor="p-category">Category</label>

@@ -22,7 +22,7 @@ export default function ProductPicker({ products, items, onChange, onProductCrea
     if (selectedIds.includes(id)) {
       onChange(items.filter((i) => i.product_id !== id));
     } else {
-      onChange([...items, { product_id: id, dosing_notes: '' }]);
+      onChange([...items, { product_id: id, dosing_notes: '', reason: '' }]);
     }
   }
 
@@ -34,13 +34,17 @@ export default function ProductPicker({ products, items, onChange, onProductCrea
     onChange(items.map((i) => (i.product_id === id ? { ...i, dosing_notes } : i)));
   }
 
+  function updateReason(id, reason) {
+    onChange(items.map((i) => (i.product_id === id ? { ...i, reason } : i)));
+  }
+
   async function createAndSelect() {
     setCreating(true);
     setError('');
     try {
       const product = await apiFetch('/products', { method: 'POST', body: JSON.stringify({ name: query.trim() }) });
       onProductCreated(product);
-      onChange([...items, { product_id: product.id, dosing_notes: '' }]);
+      onChange([...items, { product_id: product.id, dosing_notes: '', reason: '' }]);
       setQuery('');
     } catch (err) {
       setError(err.message);
@@ -75,6 +79,12 @@ export default function ProductPicker({ products, items, onChange, onProductCrea
                   placeholder="How to use it (e.g. twice daily after cleansing)"
                   value={item.dosing_notes}
                   onChange={(e) => updateNotes(item.product_id, e.target.value)}
+                />
+                <input
+                  className="input input-sm"
+                  placeholder="Why recommended (shown to the patient, optional)"
+                  value={item.reason || ''}
+                  onChange={(e) => updateReason(item.product_id, e.target.value)}
                 />
               </div>
             );

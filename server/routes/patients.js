@@ -64,13 +64,26 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async 
   res.status(201).json(rows[0]);
 }));
 
-// Update a patient's profile details (allergies, skin type, etc). Staff only.
-router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
+const VALID_CONTACT_METHODS = ['phone', 'whatsapp', 'sms', 'email'];
+
+// Update a patient's profile. Staff can edit clinical/account fields
+// (allergies, skin type, etc). A patient hitting their own record can only
+// ever change preferred_contact_method -- every other field is silently
+// ignored for them rather than trusted from the request body.
+router.patch('/:id', verifyToken, asyncHandler(async (req, res) => {
   const { id } = req.params;
   if (!isValidId(id)) {
     return res.status(400).json({ error: 'Invalid patient id' });
   }
-  const { name, dob, skin_type, hair_type, allergies, conditions, pregnancy_flag } = req.body;
+  const isStaff = req.user.role === 'staff' || req.user.role === 'admin';
+  if (!isStaff && String(req.user.id) !== String(id)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const { name, dob, skin_type, hair_type, allergies, conditions, pregnancy_flag, preferred_contact_method } = req.body;
+  if (preferred_contact_method && !VALID_CONTACT_METHODS.includes(preferred_contact_method)) {
+    return res.status(400).json({ error: `preferred_contact_method must be one of ${VALID_CONTACT_METHODS.join(', ')}` });
+  }
 
   const { rows } = await pool.query(
     `UPDATE patients SET
@@ -80,17 +93,19 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
        hair_type = COALESCE($4, hair_type),
        allergies = COALESCE($5, allergies),
        conditions = COALESCE($6, conditions),
-       pregnancy_flag = COALESCE($7, pregnancy_flag)
-     WHERE id = $8
-     RETURNING id, name, phone, dob, skin_type, hair_type, allergies, conditions, pregnancy_flag, loyalty_tier`,
+       pregnancy_flag = COALESCE($7, pregnancy_flag),
+       preferred_contact_method = COALESCE($8, preferred_contact_method)
+     WHERE id = $9
+     RETURNING id, name, phone, dob, skin_type, hair_type, allergies, conditions, pregnancy_flag, preferred_contact_method, loyalty_tier`,
     [
-      name || null,
-      dob || null,
-      skin_type || null,
-      hair_type || null,
-      allergies || null,
-      conditions || null,
-      pregnancy_flag ?? null,
+      isStaff ? (name || null) : null,
+      isStaff ? (dob || null) : null,
+      isStaff ? (skin_type || null) : null,
+      isStaff ? (hair_type || null) : null,
+      isStaff ? (allergies || null) : null,
+      isStaff ? (conditions || null) : null,
+      isStaff ? (pregnancy_flag ?? null) : null,
+      preferred_contact_method || null,
       id,
     ]
   );
@@ -115,7 +130,8 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
 
   const patientResult = await pool.query(
     `SELECT id, name, phone, dob, skin_type, hair_type, allergies, conditions,
-            pregnancy_flag, purchase_total_lifetime, purchase_total_rolling_12mo, loyalty_tier
+            pregnancy_flag, purchase_total_lifetime, purchase_total_rolling_12mo, loyalty_tier,
+            preferred_contact_method
      FROM patients WHERE id = $1`,
     [id]
   );
@@ -124,18 +140,31 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
     return res.status(404).json({ error: 'Patient not found' });
   }
 
+  // `assessment` is the pharmacist's internal clinical judgment -- never
+  // sent to the patient. `patient_summary` (optionally filled in by staff
+  // per visit) is what a patient sees instead; complaint and lifestyle
+  // advice are things said to/given directly to the patient already, so
+  // those stay visible. This is enforced here, server-side, not just left
+  // to the UI to hide.
   const visitsResult = await pool.query(
-    `SELECT v.id, v.visit_date, v.complaint, v.assessment, v.lifestyle_advice,
+    `SELECT v.id, v.visit_date, v.complaint, v.patient_summary, v.lifestyle_advice,
+            ${isStaff ? 'v.assessment,' : ''}
             v.photo_urls, v.next_followup_date, v.care_plan_id, s.name AS staff_name,
+            COUNT(vp.id) FILTER (WHERE vp.status = 'started') AS started_count,
+            COUNT(vp.id) FILTER (WHERE vp.status = 'recommended') AS recommended_count,
             COALESCE(
               json_agg(
                 json_build_object(
+                  'id', vp.id,
                   'product_id', vp.product_id,
                   'product_name', p.name,
                   'is_supplement', vp.is_supplement,
-                  'dosing_notes', vp.dosing_notes
-                )
-              ) FILTER (WHERE vp.id IS NOT NULL), '[]'
+                  'dosing_notes', vp.dosing_notes,
+                  'status', vp.status,
+                  'reason', vp.reason,
+                  'started_date', vp.started_date
+                ) ORDER BY vp.id
+              ) FILTER (WHERE vp.id IS NOT NULL AND (vp.patient_visible OR $2)), '[]'
             ) AS products
      FROM visits v
      LEFT JOIN staff s ON s.id = v.staff_id
@@ -144,15 +173,18 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
      WHERE v.patient_id = $1
      GROUP BY v.id, s.name
      ORDER BY v.visit_date DESC`,
-    [id]
+    [id, isStaff]
   );
 
+  // LEFT JOINs so a follow-up created directly from a lab result (no visit
+  // yet) still shows up for the patient, not just visit-driven ones.
   const followupsResult = await pool.query(
-    `SELECT f.id, f.visit_id, f.scheduled_date, f.sent_date, f.response,
+    `SELECT f.id, f.visit_id, f.lab_result_id, f.scheduled_date, f.sent_date, f.response,
             f.patient_comment, f.status
      FROM followups f
-     JOIN visits v ON v.id = f.visit_id
-     WHERE v.patient_id = $1
+     LEFT JOIN visits v ON v.id = f.visit_id
+     LEFT JOIN lab_results lr ON lr.id = f.lab_result_id
+     WHERE COALESCE(v.patient_id, lr.patient_id) = $1
      ORDER BY f.scheduled_date DESC`,
     [id]
   );

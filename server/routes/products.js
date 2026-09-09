@@ -18,7 +18,18 @@ const spreadsheetUpload = multer({
   },
 });
 
-const SELECT_COLUMNS = 'id, name, category, sku, price, stock_qty, duration_days, description, image_url, allergens, is_active';
+const SELECT_COLUMNS = 'id, name, brand, category, sku, price, stock_qty, duration_days, description, image_url, allergens, is_active';
+const LOW_STOCK_THRESHOLD = 5;
+
+// GREEN: available. ORANGE: low stock. RED: active but out of stock.
+// GRAY: not currently carried (staff has hidden/discontinued it). Always
+// paired with a text label -- color is never the only signal.
+function computeAvailability(product) {
+  if (!product.is_active) return { level: 'gray', label: 'Not currently carried' };
+  if (product.stock_qty == null || product.stock_qty <= 0) return { level: 'red', label: 'Currently unavailable' };
+  if (product.stock_qty <= LOW_STOCK_THRESHOLD) return { level: 'orange', label: 'Low stock' };
+  return { level: 'green', label: 'Available at Al Chark' };
+}
 
 // Full product list for staff catalog management. Staff only.
 router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
@@ -29,9 +40,27 @@ router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (
 // Patient-facing catalog: active products only, any signed-in user.
 router.get('/catalog', verifyToken, asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, name, category, price, description, image_url FROM products WHERE is_active = true ORDER BY category, name`
+    `SELECT id, name, brand, category, price, description, image_url, stock_qty, is_active
+     FROM products WHERE is_active = true ORDER BY category, name`
   );
-  res.json(rows);
+  res.json(rows.map((p) => ({ ...p, availability: computeAvailability(p) })));
+}));
+
+// Patient-facing product search -- includes inactive products (as GRAY
+// "not currently carried") so a search never falsely reads as "we don't
+// have this" when really it's just discontinued. Searches name/brand/
+// category; SKU is staff-internal so it's not part of this search.
+router.get('/search', verifyToken, asyncHandler(async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json([]);
+
+  const { rows } = await pool.query(
+    `SELECT ${SELECT_COLUMNS} FROM products
+     WHERE name ILIKE $1 OR brand ILIKE $1 OR category ILIKE $1
+     ORDER BY is_active DESC, name LIMIT 40`,
+    [`%${q}%`]
+  );
+  res.json(rows.map((p) => ({ ...p, availability: computeAvailability(p) })));
 }));
 
 // Suggested products for a patient: matched by skin/hair type and by
@@ -70,7 +99,7 @@ router.get('/suggestions/:patientId', verifyToken, asyncHandler(async (req, res)
   const nutrientNameByKey = new Map(nutrientRows.map((n) => [n.key, n.name]));
 
   const { rows: candidates } = await pool.query(
-    `SELECT DISTINCT p.id, p.name, p.category, p.price, p.description, p.image_url, p.allergens,
+    `SELECT DISTINCT p.id, p.name, p.brand, p.category, p.price, p.description, p.image_url, p.allergens, p.stock_qty, p.is_active,
             CASE WHEN p.category = ANY($1::text[]) THEN true ELSE false END AS matches_profile,
             (SELECT array_agg(DISTINCT pn.nutrient_key) FROM product_nutrients pn WHERE pn.product_id = p.id AND pn.nutrient_key = ANY($2::text[])) AS matched_nutrients
      FROM products p
@@ -90,10 +119,55 @@ router.get('/suggestions/:patientId', verifyToken, asyncHandler(async (req, res)
         const names = p.matched_nutrients.map((k) => nutrientNameByKey.get(k) || k);
         reasons.push(`Supplies ${names.join(', ')}, recently flagged on your labs`);
       }
-      return { id: p.id, name: p.name, category: p.category, price: p.price, description: p.description, image_url: p.image_url, reasons };
+      return { id: p.id, name: p.name, brand: p.brand, category: p.category, price: p.price, description: p.description, image_url: p.image_url, availability: computeAvailability(p), reasons };
     });
 
   res.json(suggestions);
+}));
+
+// Product detail. Any signed-in user. If this patient was personally
+// recommended this product during a visit, surfaces that (and which visit)
+// so the portal can show "Recommended for you during your <date> visit" --
+// continuity between the consultation and the product, not just a generic
+// catalog page.
+router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!/^\d+$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid product id' });
+  }
+
+  const { rows } = await pool.query(`SELECT ${SELECT_COLUMNS} FROM products WHERE id = $1`, [id]);
+  const product = rows[0];
+  if (!product) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+
+  let recommendation = null;
+  if (req.user.role === 'patient') {
+    const { rows: recs } = await pool.query(
+      `SELECT vp.id AS visit_product_id, vp.reason, vp.dosing_notes, vp.status, v.visit_date
+       FROM visit_products vp
+       JOIN visits v ON v.id = vp.visit_id
+       WHERE vp.product_id = $1 AND v.patient_id = $2 AND vp.patient_visible = true
+       ORDER BY v.visit_date DESC LIMIT 1`,
+      [id, req.user.id]
+    );
+    recommendation = recs[0] || null;
+  }
+
+  const { rows: related } = await pool.query(
+    `SELECT id, name, brand, price, image_url, stock_qty, is_active FROM products
+     WHERE category = $1 AND id != $2 AND is_active = true
+     ORDER BY name LIMIT 4`,
+    [product.category, id]
+  );
+
+  res.json({
+    ...product,
+    availability: computeAvailability(product),
+    recommendation,
+    related_products: related.map((p) => ({ ...p, availability: computeAvailability(p) })),
+  });
 }));
 
 // Preview or commit a bulk product import from an .xlsx spreadsheet.
@@ -190,7 +264,7 @@ router.post('/:id/image', verifyToken, requireRole('staff', 'admin'), upload.sin
 
 // Add a product to the catalog. Staff only.
 router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
-  const { name, category, sku, price, stock_qty, duration_days, description, allergens } = req.body;
+  const { name, brand, category, sku, price, stock_qty, duration_days, description, allergens } = req.body;
   if (!name) {
     return res.status(400).json({ error: 'name is required' });
   }
@@ -207,11 +281,12 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async 
     : (allergens || '').split(',').map((a) => a.trim().toLowerCase()).filter(Boolean);
 
   const { rows } = await pool.query(
-    `INSERT INTO products (name, category, sku, price, stock_qty, duration_days, description, allergens)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO products (name, brand, category, sku, price, stock_qty, duration_days, description, allergens)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING ${SELECT_COLUMNS}`,
     [
       name,
+      brand || null,
       category || null,
       sku || null,
       price === '' || price == null ? null : price,
@@ -227,7 +302,7 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async 
 // Edit a product's catalog details. Staff only.
 router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, category, sku, price, stock_qty, duration_days, description, allergens, is_active } = req.body;
+  const { name, brand, category, sku, price, stock_qty, duration_days, description, allergens, is_active } = req.body;
 
   if (sku) {
     const existing = await pool.query('SELECT id FROM products WHERE sku = $1 AND id != $2', [sku, id]);
@@ -245,17 +320,18 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
   const { rows } = await pool.query(
     `UPDATE products SET
        name = COALESCE($1, name),
-       category = COALESCE($2, category),
-       sku = COALESCE($3, sku),
-       price = COALESCE($4, price),
-       stock_qty = COALESCE($5, stock_qty),
-       duration_days = COALESCE($6, duration_days),
-       description = COALESCE($7, description),
-       allergens = COALESCE($8, allergens),
-       is_active = COALESCE($9, is_active)
-     WHERE id = $10
+       brand = COALESCE($2, brand),
+       category = COALESCE($3, category),
+       sku = COALESCE($4, sku),
+       price = COALESCE($5, price),
+       stock_qty = COALESCE($6, stock_qty),
+       duration_days = COALESCE($7, duration_days),
+       description = COALESCE($8, description),
+       allergens = COALESCE($9, allergens),
+       is_active = COALESCE($10, is_active)
+     WHERE id = $11
      RETURNING ${SELECT_COLUMNS}`,
-    [name || null, category || null, sku || null, price ?? null, stock_qty ?? null, duration_days ?? null, description || null, allergenList, is_active ?? null, id]
+    [name || null, brand || null, category || null, sku || null, price ?? null, stock_qty ?? null, duration_days ?? null, description || null, allergenList, is_active ?? null, id]
   );
 
   if (rows.length === 0) {

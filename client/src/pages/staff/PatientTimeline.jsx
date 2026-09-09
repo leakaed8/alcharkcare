@@ -143,8 +143,12 @@ export default function PatientTimeline() {
     apiFetch(`/labs/${id}`).then(setLabData).catch((err) => setError(err.message));
   }
 
-  useEffect(() => {
+  function loadPatient() {
     apiFetch(`/patients/${id}`).then(setData).catch((err) => setError(err.message));
+  }
+
+  useEffect(() => {
+    loadPatient();
     apiFetch(`/purchases/${id}`).then(setPurchases).catch((err) => setError(err.message));
     loadLabs();
   }, [id]);
@@ -184,7 +188,7 @@ export default function PatientTimeline() {
       <CarePlanList patientId={id} canManage />
 
       <h3 className="section-title">Visit history</h3>
-      <VisitHistoryList visits={visits} />
+      <VisitHistoryList visits={visits} onProductStatusChanged={loadPatient} />
 
       <h3 className="section-title">Progress photos</h3>
       <ProgressPhotos patientId={id} />

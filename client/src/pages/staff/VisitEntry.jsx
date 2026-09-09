@@ -24,6 +24,7 @@ export default function VisitEntry() {
 
   const [complaint, setComplaint] = useState('');
   const [assessment, setAssessment] = useState('');
+  const [patientSummary, setPatientSummary] = useState('');
   const [lifestyleAdvice, setLifestyleAdvice] = useState('');
   const [nextFollowupDate, setNextFollowupDate] = useState('');
   const [products, setProducts] = useState([]);
@@ -91,6 +92,7 @@ export default function VisitEntry() {
           care_plan_id: carePlanId || null,
           complaint,
           assessment,
+          patient_summary: patientSummary,
           lifestyle_advice: lifestyleAdvice,
           next_followup_date: nextFollowupDate || null,
           products: productItems,
@@ -182,8 +184,18 @@ export default function VisitEntry() {
           <textarea id="complaint" className="textarea" value={complaint} onChange={(e) => setComplaint(e.target.value)} />
         </div>
         <div className="form-field">
-          <label className="field-label" htmlFor="assessment">Assessment</label>
+          <label className="field-label" htmlFor="assessment">Assessment (internal -- never shown to the patient)</label>
           <textarea id="assessment" className="textarea" value={assessment} onChange={(e) => setAssessment(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="patientSummary">Patient-visible summary (optional)</label>
+          <textarea
+            id="patientSummary"
+            className="textarea"
+            value={patientSummary}
+            onChange={(e) => setPatientSummary(e.target.value)}
+            placeholder="A short, plain-language summary the patient will see in their portal. If left blank, they'll see a generic message instead."
+          />
         </div>
         <div className="form-field">
           <label className="field-label" htmlFor="lifestyleAdvice">Treatment suggestion / lifestyle advice</label>
