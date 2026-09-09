@@ -3,9 +3,11 @@ import { useAuth } from '../../auth/AuthContext';
 import { apiFetch } from '../../api/client';
 import LabScanner from '../../components/LabScanner';
 import PurchaseScanner from '../../components/PurchaseScanner';
+import VisitHistoryList from '../../components/VisitHistoryList';
 
 export default function MyCare() {
   const { user, logout } = useAuth();
+  const [data, setData] = useState(null);
   const [purchases, setPurchases] = useState([]);
   const [error, setError] = useState('');
 
@@ -18,6 +20,7 @@ export default function MyCare() {
   }
 
   useEffect(() => {
+    apiFetch(`/patients/${user.id}`).then(setData).catch((err) => setError(err.message));
     loadPurchases();
   }, []);
 
@@ -34,6 +37,21 @@ export default function MyCare() {
       </div>
 
       {error && <p className="alert alert-error">{error}</p>}
+
+      <h3 className="section-title">Visit history</h3>
+      {!data ? <p className="muted">Loading…</p> : <VisitHistoryList visits={data.visits} />}
+
+      <h3 className="section-title">Follow-ups</h3>
+      {data && data.followups.length === 0 && <p className="muted">No follow-ups logged.</p>}
+      {data && (
+        <ul className="followup-list">
+          {data.followups.map((f) => (
+            <li key={f.id}>
+              {f.scheduled_date} — {f.status} {f.response ? `(${f.response})` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <h3 className="section-title">Scan a lab result</h3>
       <p className="muted">See if a product you're taking looks like it's helping your levels.</p>
