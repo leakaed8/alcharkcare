@@ -15,6 +15,7 @@ export default function StaffLayout() {
           <NavLink to="/staff/patients">Patients</NavLink>
           <NavLink to="/staff/visits/new">New visit</NavLink>
           <NavLink to="/staff/followups">Follow-ups</NavLink>
+          {user?.role === 'admin' && <NavLink to="/staff/manager">Manager</NavLink>}
         </nav>
         <div className="app-header__spacer" />
         <div className="app-header__user">

@@ -9,11 +9,30 @@ search/visit entry/timeline, and the follow-up dashboard. Web push,
 node-cron scheduling, Telegram alerts, progress photos, and the shop are not
 built yet.
 
+Also included: lab-result scanning (patients or staff can photograph a lab
+report; free/offline OCR extracts known markers and flags whether a product
+on file looks like it's helping -- informational only, not medical advice),
+product/invoice scanning (only the product name is ever saved, never the
+photo -- patients can log a product they have, staff can scan a
+parapharmacy sales invoice for a patient), and a manager-only dashboard
+(hidden from regular staff) with business KPIs and marketing segments
+(inactive patients, frequent buyers).
+
 ## Stack
 
 - Client: React + Vite, role-based routing (`/staff/*`, `/patient/*`)
 - Server: Node/Express, JWT auth, role middleware
 - Database: PostgreSQL
+- OCR: tesseract.js (free, runs offline -- no image is ever stored, only
+  the extracted text/names)
+
+## Storage
+
+Only text is ever stored -- lab-scan values, product names, notes -- never
+photos. That keeps rows in the low single-digit KB range even for a heavy
+user, so a free 1GB Render Postgres plan comfortably holds many thousands
+of patients' full history. Render's $7/mo Starter Postgres plan (10GB) is
+the upgrade path if you ever need more.
 
 ## Local development
 
@@ -69,3 +88,14 @@ If you'd rather set things up manually instead of using the Blueprint, create
 a Postgres database and a Node web service pointing at this repo with build
 command `npm run build`, start command `npm start`, and set `DATABASE_URL` /
 `JWT_SECRET` env vars yourself.
+
+## OCR notes
+
+Lab-result and product/invoice scanning use tesseract.js, a free/offline
+OCR engine (no API key, no per-scan cost) -- the tradeoff is lower accuracy
+than a paid vision API, especially on blurry photos, handwriting, or
+unusual fonts. Both scan flows always show what was extracted before
+saving anything, so a bad read is easy to catch/correct rather than silently
+wrong. On Render's free web service plan (256MB RAM), OCR is noticeably
+slower and a very large photo may fail -- the Starter plan's extra RAM
+would speed this up if it becomes a bottleneck.

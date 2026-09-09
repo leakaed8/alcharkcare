@@ -4,6 +4,8 @@ import StaffLayout from './components/StaffLayout';
 import Login from './pages/Login';
 import MyCare from './pages/patient/MyCare';
 import FollowupDashboard from './pages/staff/FollowupDashboard';
+import InvoiceScan from './pages/staff/InvoiceScan';
+import ManagerDashboard from './pages/staff/ManagerDashboard';
 import PatientSearch from './pages/staff/PatientSearch';
 import PatientTimeline from './pages/staff/PatientTimeline';
 import VisitEntry from './pages/staff/VisitEntry';
@@ -24,8 +26,17 @@ export default function App() {
         <Route index element={<Navigate to="patients" replace />} />
         <Route path="patients" element={<PatientSearch />} />
         <Route path="patients/:id" element={<PatientTimeline />} />
+        <Route path="patients/:id/scan-invoice" element={<InvoiceScan />} />
         <Route path="visits/new" element={<VisitEntry />} />
         <Route path="followups" element={<FollowupDashboard />} />
+        <Route
+          path="manager"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <ManagerDashboard />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       <Route
