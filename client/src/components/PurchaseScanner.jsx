@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { apiFetch, apiUpload } from '../api/client';
 
-// Shared "scan a photo -> confirm candidates -> save" flow. Used both by a
-// patient scanning a single product they have, and by staff scanning a
+// Shared "scan a photo -> confirm candidates -> save" flow, plus a manual
+// entry fallback for when OCR reads a name wrong. Used both by a patient
+// scanning/adding a single product they have, and by staff scanning a
 // parapharmacy sales invoice for a patient. Only the confirmed names are
 // ever saved -- the photo itself never leaves this form.
 export default function PurchaseScanner({ patientId, onSaved }) {
+  const [mode, setMode] = useState('scan');
   const [candidates, setCandidates] = useState(null);
+  const [manualName, setManualName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -27,7 +30,7 @@ export default function PurchaseScanner({ patientId, onSaved }) {
         found.map((c) => ({ ...c, include: c.confidence >= 0.5 }))
       );
       if (found.length === 0) {
-        setError('No product-like text was found in that photo. Try a clearer, closer photo.');
+        setError('No product-like text was found in that photo. Try a clearer photo, or add it manually below.');
       }
     } catch (err) {
       setError(err.message);
@@ -35,6 +38,17 @@ export default function PurchaseScanner({ patientId, onSaved }) {
       setBusy(false);
       e.target.value = '';
     }
+  }
+
+  function addManualEntry(e) {
+    e.preventDefault();
+    if (!manualName.trim()) return;
+    setCandidates((prev) => [
+      ...(prev || []),
+      { product_id: null, product_name: manualName.trim(), confidence: 0, include: true },
+    ]);
+    setManualName('');
+    setSuccess('');
   }
 
   function updateCandidate(index, patch) {
@@ -63,19 +77,40 @@ export default function PurchaseScanner({ patientId, onSaved }) {
 
   return (
     <div>
-      <div className="scan-box">
-        <p className="muted">Take or upload a photo of a product or sales invoice.</p>
-        <input type="file" accept="image/*" capture="environment" onChange={handleFile} disabled={busy} />
-        <p className="disclaimer">Only the product name(s) are saved -- the photo itself is never stored.</p>
+      <div className="tab-group mb-3">
+        <button type="button" className={`tab-btn ${mode === 'scan' ? 'active' : ''}`} onClick={() => setMode('scan')}>
+          Scan a photo
+        </button>
+        <button type="button" className={`tab-btn ${mode === 'manual' ? 'active' : ''}`} onClick={() => setMode('manual')}>
+          Add manually
+        </button>
       </div>
+
+      {mode === 'scan' ? (
+        <div className="scan-box">
+          <p className="muted">Take or upload a photo of a product or sales invoice.</p>
+          <input type="file" accept="image/*" capture="environment" onChange={handleFile} disabled={busy} />
+          <p className="disclaimer">Only the product name(s) are saved -- the photo itself is never stored.</p>
+        </div>
+      ) : (
+        <form onSubmit={addManualEntry} className="row-actions">
+          <input
+            className="input"
+            placeholder="Product name"
+            value={manualName}
+            onChange={(e) => setManualName(e.target.value)}
+          />
+          <button type="submit" className="btn btn-secondary">Add</button>
+        </form>
+      )}
 
       {busy && <p className="muted">Reading photo…</p>}
       {error && <p className="alert alert-error">{error}</p>}
       {success && <p className="alert alert-success">{success}</p>}
 
       {candidates && candidates.length > 0 && (
-        <div className="card">
-          <p className="field-label">Confirm what was found:</p>
+        <div className="card mt-3">
+          <p className="field-label">Confirm what to save:</p>
           {candidates.map((c, i) => (
             <div key={i} className="candidate-row">
               <input

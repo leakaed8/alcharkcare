@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import MyCare from './pages/patient/MyCare';
 import FollowupDashboard from './pages/staff/FollowupDashboard';
 import InvoiceScan from './pages/staff/InvoiceScan';
+import LabTestTypeManager from './pages/staff/LabTestTypeManager';
 import ManagerDashboard from './pages/staff/ManagerDashboard';
 import PatientSearch from './pages/staff/PatientSearch';
 import PatientTimeline from './pages/staff/PatientTimeline';
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="visits/new" element={<VisitEntry />} />
         <Route path="followups" element={<FollowupDashboard />} />
         <Route path="products" element={<ProductManager />} />
+        <Route path="lab-tests" element={<LabTestTypeManager />} />
         <Route
           path="manager"
           element={
