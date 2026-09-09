@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiFetch } from '../../api/client';
+import VisitHistoryList from '../../components/VisitHistoryList';
 
 const FLAG_LABELS = { low: 'Low', normal: 'Normal', high: 'High', unknown: 'Unclear' };
 
@@ -29,7 +30,13 @@ export default function PatientTimeline() {
           <h2>{patient.name}</h2>
           <div className="patient-header__meta">
             {patient.phone} · <span className={`badge badge-${patient.loyalty_tier}`}>{patient.loyalty_tier}</span>
+            {patient.skin_type && <> · Skin: {patient.skin_type}</>}
           </div>
+          {patient.allergies && patient.allergies.length > 0 && (
+            <div className="patient-header__meta">
+              <span className="badge badge-flag-low">Allergies: {patient.allergies.join(', ')}</span>
+            </div>
+          )}
         </div>
         <div className="row-actions">
           <Link className="btn btn-secondary" to={`/staff/patients/${patient.id}/scan-invoice`}>
@@ -42,22 +49,7 @@ export default function PatientTimeline() {
       </div>
 
       <h3 className="section-title">Visit history</h3>
-      {visits.length === 0 && <p className="muted">No visits yet.</p>}
-      {visits.map((v) => (
-        <div key={v.id} className="visit-card">
-          <div className="visit-card__date">{new Date(v.visit_date).toLocaleDateString()}</div>
-          <div className="visit-card__meta">seen by {v.staff_name}</div>
-          <p className="visit-card__row"><b>Complaint:</b> {v.complaint || '—'}</p>
-          <p className="visit-card__row"><b>Assessment:</b> {v.assessment || '—'}</p>
-          <p className="visit-card__row"><b>Lifestyle advice:</b> {v.lifestyle_advice || '—'}</p>
-          {v.products.length > 0 && (
-            <p className="visit-card__row"><b>Products:</b> {v.products.map((p) => p.product_name).join(', ')}</p>
-          )}
-          {v.next_followup_date && (
-            <p className="visit-card__row"><b>Next follow-up:</b> {v.next_followup_date}</p>
-          )}
-        </div>
-      ))}
+      <VisitHistoryList visits={visits} />
 
       <h3 className="section-title">Purchase history</h3>
       {purchases.length === 0 && <p className="muted">No purchases logged.</p>}

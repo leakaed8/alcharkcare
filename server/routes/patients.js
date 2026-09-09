@@ -59,6 +59,40 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), async (req, res) =>
   res.status(201).json(rows[0]);
 });
 
+// Update a patient's profile details (allergies, skin type, etc). Staff only.
+router.patch('/:id', verifyToken, requireRole('staff', 'admin'), async (req, res) => {
+  const { id } = req.params;
+  const { name, dob, skin_type, hair_type, allergies, conditions, pregnancy_flag } = req.body;
+
+  const { rows } = await pool.query(
+    `UPDATE patients SET
+       name = COALESCE($1, name),
+       dob = COALESCE($2, dob),
+       skin_type = COALESCE($3, skin_type),
+       hair_type = COALESCE($4, hair_type),
+       allergies = COALESCE($5, allergies),
+       conditions = COALESCE($6, conditions),
+       pregnancy_flag = COALESCE($7, pregnancy_flag)
+     WHERE id = $8
+     RETURNING id, name, phone, dob, skin_type, hair_type, allergies, conditions, pregnancy_flag, loyalty_tier`,
+    [
+      name || null,
+      dob || null,
+      skin_type || null,
+      hair_type || null,
+      allergies || null,
+      conditions || null,
+      pregnancy_flag ?? null,
+      id,
+    ]
+  );
+
+  if (rows.length === 0) {
+    return res.status(404).json({ error: 'Patient not found' });
+  }
+  res.json(rows[0]);
+});
+
 // Patient timeline: patient profile + visits (with products) + followups.
 // Staff can view any patient; a patient can only view their own record.
 router.get('/:id', verifyToken, async (req, res) => {
