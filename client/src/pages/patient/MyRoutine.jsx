@@ -160,7 +160,10 @@ export default function MyRoutine() {
           <p className="muted">
             {p.status === 'started' && p.started_date ? `Started ${new Date(p.started_date).toLocaleDateString()}` : `Recommended ${new Date(p.visit_date).toLocaleDateString()}`}
           </p>
-          {p.reason && <p className="p-card__body">Why: {p.reason}</p>}
+          {tab === 'recommended' && (
+            <p className="p-card__body">{p.reason ? `Why: ${p.reason}` : 'Recommended by your pharmacist'}</p>
+          )}
+          {tab !== 'recommended' && p.reason && <p className="p-card__body">Why: {p.reason}</p>}
           {p.dosing_notes && <p className="p-card__body">How to use: {p.dosing_notes}</p>}
           <div className="row-actions mt-2">
             <Link className="p-cta p-cta--secondary" to={`/patient/shop/${p.product_id}`}>View product →</Link>
