@@ -25,7 +25,9 @@ export default function VisitEntry() {
   const [complaint, setComplaint] = useState('');
   const [assessment, setAssessment] = useState('');
   const [patientSummary, setPatientSummary] = useState('');
-  const [lifestyleAdvice, setLifestyleAdvice] = useState('');
+  const [lifestyleOptions, setLifestyleOptions] = useState([]);
+  const [selectedLifestyle, setSelectedLifestyle] = useState(new Set());
+  const [lifestyleOther, setLifestyleOther] = useState('');
   const [nextFollowupDate, setNextFollowupDate] = useState('');
   const [products, setProducts] = useState([]);
   const [productItems, setProductItems] = useState([]); // [{ product_id, dosing_notes }]
@@ -33,9 +35,25 @@ export default function VisitEntry() {
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // The final lifestyle_advice string sent to the backend, combining
+  // whichever checklist options are picked with anything staff typed
+  // themselves -- the backend field itself stays plain text, only how
+  // staff builds it up here has changed.
+  const lifestyleAdvice = [...selectedLifestyle, lifestyleOther.trim()].filter(Boolean).join('; ');
+
   useEffect(() => {
     apiFetch('/products').then(setProducts).catch((err) => setError(err.message));
+    apiFetch('/lifestyle-options').then(setLifestyleOptions).catch(() => {});
   }, []);
+
+  function toggleLifestyle(text) {
+    setSelectedLifestyle((prev) => {
+      const next = new Set(prev);
+      if (next.has(text)) next.delete(text);
+      else next.add(text);
+      return next;
+    });
+  }
 
   useEffect(() => {
     const urlId = searchParams.get('patientId');
@@ -53,6 +71,23 @@ export default function VisitEntry() {
       })
       .catch((err) => setError(err.message));
   }, [patientId]);
+
+  // A plain-language starting point built from what's already on the form --
+  // never called automatically, so it never clobbers something staff typed.
+  // Staff can still edit the result before saving; this just means the
+  // field doesn't have to be written from scratch (or left blank) every time.
+  function generateSummary() {
+    const parts = [];
+    if (complaint.trim()) parts.push(`You came in about: ${complaint.trim()}.`);
+    const productNames = productItems
+      .map((i) => products.find((p) => p.id === i.product_id)?.name)
+      .filter(Boolean);
+    if (productNames.length > 0) {
+      parts.push(`Your pharmacist recommended ${productNames.join(', ')} to help with this.`);
+    }
+    if (lifestyleAdvice.trim()) parts.push(`They also suggested: ${lifestyleAdvice.trim()}`);
+    setPatientSummary(parts.join(' ') || 'Your pharmacist reviewed this visit with you.');
+  }
 
   function handleProductCreated(product) {
     setProducts((prev) => [...prev, product].sort((a, b) => a.name.localeCompare(b.name)));
@@ -188,7 +223,12 @@ export default function VisitEntry() {
           <textarea id="assessment" className="textarea" value={assessment} onChange={(e) => setAssessment(e.target.value)} />
         </div>
         <div className="form-field">
-          <label className="field-label" htmlFor="patientSummary">Patient-visible summary (optional)</label>
+          <div className="row-actions" style={{ justifyContent: 'space-between' }}>
+            <label className="field-label" htmlFor="patientSummary">Patient-visible summary (optional)</label>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={generateSummary}>
+              ✨ Generate from visit details
+            </button>
+          </div>
           <textarea
             id="patientSummary"
             className="textarea"
@@ -198,12 +238,27 @@ export default function VisitEntry() {
           />
         </div>
         <div className="form-field">
-          <label className="field-label" htmlFor="lifestyleAdvice">Treatment suggestion / lifestyle advice</label>
+          <label className="field-label">Treatment suggestion / lifestyle advice</label>
+          {lifestyleOptions.length > 0 && (
+            <div className="checkbox-grid mb-2">
+              {lifestyleOptions.map((opt) => (
+                <label key={opt.id} className="checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedLifestyle.has(opt.text)}
+                    onChange={() => toggleLifestyle(opt.text)}
+                  />
+                  {opt.text}
+                </label>
+              ))}
+            </div>
+          )}
           <textarea
-            id="lifestyleAdvice"
+            id="lifestyleOther"
             className="textarea"
-            value={lifestyleAdvice}
-            onChange={(e) => setLifestyleAdvice(e.target.value)}
+            value={lifestyleOther}
+            onChange={(e) => setLifestyleOther(e.target.value)}
+            placeholder="Other (not in the list above)"
           />
         </div>
         <div className="form-field">

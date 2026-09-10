@@ -6,6 +6,7 @@ import { apiFetch } from '../../api/client';
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'conflicts', label: 'Conflicts' },
+  { key: 'lifestyle', label: 'Lifestyle options' },
 ];
 
 function formatValue(v) {
@@ -58,6 +59,7 @@ function Overview({ user }) {
       setSettingsForm({
         sheet_id: s.sheet_id || '',
         products_tab: s.products_tab || 'PRODUCTS',
+        lifestyle_tab: s.lifestyle_tab || 'LIFESTYLE',
         auto_sync_enabled: s.auto_sync_enabled,
         auto_sync_interval_hours: s.auto_sync_interval_hours,
       });
@@ -131,6 +133,16 @@ function Overview({ user }) {
                 value={settingsForm.products_tab}
                 onChange={(e) => setSettingsForm({ ...settingsForm, products_tab: e.target.value })}
               />
+            </div>
+            <div className="form-field">
+              <label className="field-label" htmlFor="lifestyle-tab">Lifestyle options tab name (optional)</label>
+              <input
+                id="lifestyle-tab"
+                className="input"
+                value={settingsForm.lifestyle_tab}
+                onChange={(e) => setSettingsForm({ ...settingsForm, lifestyle_tab: e.target.value })}
+              />
+              <p className="muted">A single column of lifestyle-advice suggestions, one per row below a header row. If this tab doesn't exist, it's just skipped.</p>
             </div>
             <div className="form-field">
               <label className="field-label">
@@ -244,6 +256,83 @@ function Conflicts() {
   );
 }
 
+function LifestyleOptions() {
+  const [options, setOptions] = useState([]);
+  const [text, setText] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function load() {
+    apiFetch('/lifestyle-options/all').then(setOptions).catch((err) => setError(err.message));
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function add(e) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setSaving(true);
+    setError('');
+    try {
+      await apiFetch('/lifestyle-options', { method: 'POST', body: JSON.stringify({ text: text.trim() }) });
+      setText('');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive(opt) {
+    try {
+      await apiFetch(`/lifestyle-options/${opt.id}`, { method: 'PATCH', body: JSON.stringify({ active: !opt.active }) });
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <div>
+      <p className="muted">
+        These show up as checkboxes on the New Visit form's lifestyle advice section. Add them here, or via the
+        Sheets sync's lifestyle tab (see Overview settings) -- either way, only active ones appear on the form.
+      </p>
+      <form onSubmit={add} className="row-actions mb-3">
+        <input className="input" placeholder="e.g. Increase water intake" value={text} onChange={(e) => setText(e.target.value)} />
+        <button type="submit" className="btn btn-primary" disabled={saving || !text.trim()}>Add</button>
+      </form>
+      {error && <p className="alert alert-error">{error}</p>}
+
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr><th>Text</th><th>Source</th><th>Active</th><th></th></tr>
+          </thead>
+          <tbody>
+            {options.map((opt) => (
+              <tr key={opt.id}>
+                <td>{opt.text}</td>
+                <td>{opt.source}</td>
+                <td>{opt.active ? 'Yes' : 'No'}</td>
+                <td>
+                  <button className="btn btn-sm btn-ghost" onClick={() => toggleActive(opt)}>
+                    {opt.active ? 'Disable' : 'Enable'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {options.length === 0 && <tr><td colSpan={4} className="muted">No lifestyle options yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function GoogleSheetsSync() {
   const { user } = useAuth();
   const [tab, setTab] = useState('overview');
@@ -263,7 +352,9 @@ export default function GoogleSheetsSync() {
         ))}
       </div>
 
-      {tab === 'overview' ? <Overview user={user} /> : <Conflicts />}
+      {tab === 'overview' && <Overview user={user} />}
+      {tab === 'conflicts' && <Conflicts />}
+      {tab === 'lifestyle' && <LifestyleOptions />}
     </div>
   );
 }

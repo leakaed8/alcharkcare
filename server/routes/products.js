@@ -24,6 +24,10 @@ const SELECT_COLUMNS = 'id, name, brand, category, sku, price, stock_qty, durati
 // that never belong on a patient-facing response.
 const STAFF_SELECT_COLUMNS = `${SELECT_COLUMNS}, subcategory, barcode, cost, min_stock, supplier, country, tags,
   benefits, ingredients, directions_for_use, frequency, recommendation_eligible, approval_status, last_synced_at, updated_at`;
+// Patient-facing product detail: the safe columns plus the descriptive,
+// catalog-level "how to use it" fields -- never the internal-only ones
+// (cost, supplier, barcode, etc) that STAFF_SELECT_COLUMNS carries.
+const PRODUCT_DETAIL_COLUMNS = `${SELECT_COLUMNS}, benefits, ingredients, directions_for_use, frequency`;
 const APPROVAL_STATUSES = ['draft', 'review_required', 'approved', 'published'];
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -192,7 +196,7 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Invalid product id' });
   }
 
-  const { rows } = await pool.query(`SELECT ${SELECT_COLUMNS} FROM products WHERE id = $1`, [id]);
+  const { rows } = await pool.query(`SELECT ${PRODUCT_DETAIL_COLUMNS} FROM products WHERE id = $1`, [id]);
   const product = rows[0];
   if (!product) {
     return res.status(404).json({ error: 'Product not found' });
@@ -259,9 +263,10 @@ router.post('/import', verifyToken, requireRole('staff', 'admin'), spreadsheetUp
     const allergens = row.allergens
       ? String(row.allergens).split(',').map((a) => a.trim().toLowerCase()).filter(Boolean)
       : null;
+    const imageUrl = row.image_url ? String(row.image_url).trim() : null;
 
     if (preview) {
-      previewRows.push({ row: row._row, name, brand, sku, category, price, stock_qty: stockQty, duration_days: durationDays, description, allergens });
+      previewRows.push({ row: row._row, name, brand, sku, category, price, stock_qty: stockQty, duration_days: durationDays, description, allergens, image_url: imageUrl });
       continue;
     }
 
@@ -271,9 +276,9 @@ router.post('/import', verifyToken, requireRole('staff', 'admin'), spreadsheetUp
         await pool.query(
           `UPDATE products SET name = $1, brand = COALESCE($2, brand), category = COALESCE($3, category), price = COALESCE($4, price),
              stock_qty = COALESCE($5, stock_qty), duration_days = COALESCE($6, duration_days),
-             description = COALESCE($7, description), allergens = COALESCE($8, allergens)
-           WHERE id = $9`,
-          [name, brand, category, price, stockQty, durationDays, description, allergens, existing.rows[0].id]
+             description = COALESCE($7, description), allergens = COALESCE($8, allergens), image_url = COALESCE($9, image_url), updated_at = now()
+           WHERE id = $10`,
+          [name, brand, category, price, stockQty, durationDays, description, allergens, imageUrl, existing.rows[0].id]
         );
         results.updated += 1;
         continue;
@@ -281,9 +286,9 @@ router.post('/import', verifyToken, requireRole('staff', 'admin'), spreadsheetUp
     }
 
     await pool.query(
-      `INSERT INTO products (name, brand, category, sku, price, stock_qty, duration_days, description, allergens)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [name, brand, category, sku, price, stockQty, durationDays, description, allergens]
+      `INSERT INTO products (name, brand, category, sku, price, stock_qty, duration_days, description, allergens, image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [name, brand, category, sku, price, stockQty, durationDays, description, allergens, imageUrl]
     );
     results.created += 1;
   }
@@ -313,7 +318,7 @@ router.post('/:id/image', verifyToken, requireRole('staff', 'admin'), upload.sin
 
   const imageUrl = await uploadProductImage(req.file.buffer, req.file.mimetype, id);
   const { rows } = await pool.query(
-    `UPDATE products SET image_url = $1 WHERE id = $2 RETURNING ${SELECT_COLUMNS}`,
+    `UPDATE products SET image_url = $1, updated_at = now() WHERE id = $2 RETURNING ${SELECT_COLUMNS}`,
     [imageUrl, id]
   );
   res.json(rows[0]);

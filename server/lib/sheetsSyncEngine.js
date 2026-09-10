@@ -9,10 +9,14 @@ const TRUE_VALUES = new Set(['true', 'yes', 'y', '1']);
 // Fields a sync is allowed to touch. Deliberately excludes things this
 // phase doesn't own: is_active/approval_status (governed by the approval
 // workflow, not overwritten by a re-sync) and sync bookkeeping itself.
+// image_url is included as a bulk alternative to uploading photos one at a
+// time in Product Manager -- the same conflict protection applies, so a
+// staff-uploaded photo (which bumps updated_at, see products.js) is never
+// silently replaced by a sheet's image_url without staff resolving it.
 const SYNCED_FIELDS = [
   'name', 'brand', 'category', 'subcategory', 'sku', 'barcode', 'price', 'cost',
   'stock_qty', 'min_stock', 'duration_days', 'description', 'benefits', 'ingredients',
-  'directions_for_use', 'frequency', 'supplier', 'country', 'allergens', 'tags',
+  'directions_for_use', 'frequency', 'supplier', 'country', 'allergens', 'tags', 'image_url',
 ];
 
 function coerceValue(field, raw) {

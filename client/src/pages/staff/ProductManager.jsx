@@ -60,8 +60,8 @@ function ImportPanel({ onImported }) {
     <div className="card mb-5">
       <p className="field-label">Import products from Excel (.xlsx)</p>
       <p className="muted">
-        Expects columns like Name, Category, SKU, Price, Stock, Duration (days), Description, Allergens -- header
-        names are matched flexibly. Existing products are matched and updated by SKU.
+        Expects columns like Name, Category, SKU, Price, Stock, Duration (days), Description, Allergens, Image URL --
+        header names are matched flexibly. Existing products are matched and updated by SKU.
       </p>
       <input ref={inputRef} type="file" accept=".xlsx" onChange={handlePreview} disabled={busy} />
       {error && <p className="alert alert-error">{error}</p>}
