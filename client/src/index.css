@@ -467,6 +467,26 @@ table.table tbody tr:last-child td {
   color: #991b1b;
 }
 
+.badge-status-draft {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.badge-status-review_required {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.badge-status-approved {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.badge-status-published {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
 .cart-panel {
   position: sticky;
   top: 12px;

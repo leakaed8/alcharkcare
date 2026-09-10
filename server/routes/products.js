@@ -19,6 +19,12 @@ const spreadsheetUpload = multer({
 });
 
 const SELECT_COLUMNS = 'id, name, brand, category, sku, price, stock_qty, duration_days, description, image_url, allergens, is_active';
+// Staff catalog management sees the fuller picture: sync/import-only fields,
+// the approval workflow state, and internal-only figures (cost, supplier)
+// that never belong on a patient-facing response.
+const STAFF_SELECT_COLUMNS = `${SELECT_COLUMNS}, subcategory, barcode, cost, min_stock, supplier, country, tags,
+  benefits, ingredients, directions_for_use, frequency, recommendation_eligible, approval_status, last_synced_at, updated_at`;
+const APPROVAL_STATUSES = ['draft', 'review_required', 'approved', 'published'];
 const LOW_STOCK_THRESHOLD = 5;
 
 // GREEN: available. ORANGE: low stock. RED: active but out of stock.
@@ -72,9 +78,18 @@ router.get('/reorder/:patientId', verifyToken, asyncHandler(async (req, res) => 
   res.json(rows.map((p) => ({ ...p, availability: computeAvailability(p) })));
 }));
 
-// Full product list for staff catalog management. Staff only.
+// Full product list for staff catalog management. Staff only. Optional
+// ?approval_status= filter, used by the "needs review" queue for products
+// a Sheets sync created as drafts.
 router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
-  const { rows } = await pool.query(`SELECT ${SELECT_COLUMNS} FROM products ORDER BY name`);
+  const { approval_status } = req.query;
+  if (approval_status && !APPROVAL_STATUSES.includes(approval_status)) {
+    return res.status(400).json({ error: `approval_status must be one of ${APPROVAL_STATUSES.join(', ')}` });
+  }
+  const { rows } = await pool.query(
+    `SELECT ${STAFF_SELECT_COLUMNS} FROM products WHERE ($1::text IS NULL OR approval_status = $1) ORDER BY name`,
+    [approval_status || null]
+  );
   res.json(rows);
 }));
 
@@ -341,10 +356,17 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async 
   res.status(201).json(rows[0]);
 }));
 
-// Edit a product's catalog details. Staff only.
+// Edit a product's catalog details. Staff only. Bumps `updated_at`, which
+// the Google Sheets sync compares against `last_synced_at` to tell whether
+// this product was edited in-app since its last sync -- so an edit here can
+// surface as a conflict next sync rather than being silently overwritten.
 router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, brand, category, sku, price, stock_qty, duration_days, description, allergens, is_active } = req.body;
+  const {
+    name, brand, category, subcategory, sku, barcode, price, cost, stock_qty, min_stock, duration_days,
+    description, benefits, ingredients, directions_for_use, frequency, supplier, country,
+    allergens, tags, recommendation_eligible, is_active,
+  } = req.body;
 
   if (sku) {
     const existing = await pool.query('SELECT id FROM products WHERE sku = $1 AND id != $2', [sku, id]);
@@ -353,29 +375,67 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
     }
   }
 
-  const allergenList = allergens == null
-    ? null
-    : Array.isArray(allergens)
-      ? allergens
-      : allergens.split(',').map((a) => a.trim().toLowerCase()).filter(Boolean);
+  const toList = (value) => (value == null ? null : Array.isArray(value) ? value : String(value).split(',').map((a) => a.trim().toLowerCase()).filter(Boolean));
+  const allergenList = toList(allergens);
+  const tagList = toList(tags);
 
   const { rows } = await pool.query(
     `UPDATE products SET
        name = COALESCE($1, name),
        brand = COALESCE($2, brand),
        category = COALESCE($3, category),
-       sku = COALESCE($4, sku),
-       price = COALESCE($5, price),
-       stock_qty = COALESCE($6, stock_qty),
-       duration_days = COALESCE($7, duration_days),
-       description = COALESCE($8, description),
-       allergens = COALESCE($9, allergens),
-       is_active = COALESCE($10, is_active)
-     WHERE id = $11
-     RETURNING ${SELECT_COLUMNS}`,
-    [name || null, brand || null, category || null, sku || null, price ?? null, stock_qty ?? null, duration_days ?? null, description || null, allergenList, is_active ?? null, id]
+       subcategory = COALESCE($4, subcategory),
+       sku = COALESCE($5, sku),
+       barcode = COALESCE($6, barcode),
+       price = COALESCE($7, price),
+       cost = COALESCE($8, cost),
+       stock_qty = COALESCE($9, stock_qty),
+       min_stock = COALESCE($10, min_stock),
+       duration_days = COALESCE($11, duration_days),
+       description = COALESCE($12, description),
+       benefits = COALESCE($13, benefits),
+       ingredients = COALESCE($14, ingredients),
+       directions_for_use = COALESCE($15, directions_for_use),
+       frequency = COALESCE($16, frequency),
+       supplier = COALESCE($17, supplier),
+       country = COALESCE($18, country),
+       allergens = COALESCE($19, allergens),
+       tags = COALESCE($20, tags),
+       recommendation_eligible = COALESCE($21, recommendation_eligible),
+       is_active = COALESCE($22, is_active),
+       updated_at = now()
+     WHERE id = $23
+     RETURNING ${STAFF_SELECT_COLUMNS}`,
+    [
+      name || null, brand || null, category || null, subcategory || null, sku || null, barcode || null,
+      price ?? null, cost ?? null, stock_qty ?? null, min_stock ?? null, duration_days ?? null,
+      description || null, benefits || null, ingredients || null, directions_for_use || null, frequency || null,
+      supplier || null, country || null, allergenList, tagList, recommendation_eligible ?? null, is_active ?? null, id,
+    ]
   );
 
+  if (rows.length === 0) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+  res.json(rows[0]);
+}));
+
+// Move a product through the approval workflow (draft -> review_required ->
+// approved -> published), e.g. after a Google Sheets sync creates a draft.
+// Publishing also makes it visible in the shop, since a sync should never
+// make something purchasable on its own. Staff only.
+router.patch('/:id/approval', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { approval_status } = req.body;
+  if (!APPROVAL_STATUSES.includes(approval_status)) {
+    return res.status(400).json({ error: `approval_status must be one of ${APPROVAL_STATUSES.join(', ')}` });
+  }
+
+  const { rows } = await pool.query(
+    `UPDATE products SET approval_status = $1, is_active = CASE WHEN $1 = 'published' THEN true ELSE is_active END
+     WHERE id = $2 RETURNING ${STAFF_SELECT_COLUMNS}`,
+    [approval_status, id]
+  );
   if (rows.length === 0) {
     return res.status(404).json({ error: 'Product not found' });
   }

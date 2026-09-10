@@ -15,6 +15,7 @@ import VisitDetail from './pages/patient/VisitDetail';
 import Visits from './pages/patient/Visits';
 import CheckinQuestions from './pages/staff/CheckinQuestions';
 import FollowupDashboard from './pages/staff/FollowupDashboard';
+import GoogleSheetsSync from './pages/staff/GoogleSheetsSync';
 import InvoiceScan from './pages/staff/InvoiceScan';
 import LabTestTypeManager from './pages/staff/LabTestTypeManager';
 import ManagerDashboard from './pages/staff/ManagerDashboard';
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="lab-tests" element={<LabTestTypeManager />} />
         <Route path="messages" element={<StaffMessages />} />
         <Route path="checkins" element={<CheckinQuestions />} />
+        <Route path="sheets-sync" element={<GoogleSheetsSync />} />
         <Route
           path="manager"
           element={

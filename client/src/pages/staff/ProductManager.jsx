@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch, apiUpload } from '../../api/client';
 
-const EMPTY_FORM = { name: '', brand: '', category: '', sku: '', price: '', stock_qty: '', duration_days: '', description: '', allergens: '', is_active: true };
+const EMPTY_FORM = {
+  name: '', brand: '', category: '', subcategory: '', sku: '', barcode: '', price: '', cost: '',
+  stock_qty: '', min_stock: '', duration_days: '', description: '', benefits: '', ingredients: '',
+  directions_for_use: '', frequency: '', supplier: '', country: '', allergens: '', tags: '', is_active: true,
+};
+
+const APPROVAL_LABELS = { draft: 'Draft', review_required: 'Needs review', approved: 'Approved', published: 'Published' };
+const APPROVAL_FILTERS = [{ value: '', label: 'All' }, ...Object.entries(APPROVAL_LABELS).map(([value, label]) => ({ value, label }))];
 
 function ImportPanel({ onImported }) {
   const [file, setFile] = useState(null);
@@ -123,6 +130,7 @@ function ImageUpload({ product, onUploaded }) {
 
 export default function ProductManager() {
   const [products, setProducts] = useState([]);
+  const [approvalFilter, setApprovalFilter] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
@@ -130,7 +138,8 @@ export default function ProductManager() {
 
   async function load() {
     try {
-      setProducts(await apiFetch('/products'));
+      const query = approvalFilter ? `?approval_status=${approvalFilter}` : '';
+      setProducts(await apiFetch(`/products${query}`));
     } catch (err) {
       setError(err.message);
     }
@@ -138,7 +147,7 @@ export default function ProductManager() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [approvalFilter]);
 
   function startEdit(p) {
     setEditingId(p.id);
@@ -146,16 +155,36 @@ export default function ProductManager() {
       name: p.name || '',
       brand: p.brand || '',
       category: p.category || '',
+      subcategory: p.subcategory || '',
       sku: p.sku || '',
+      barcode: p.barcode || '',
       price: p.price ?? '',
+      cost: p.cost ?? '',
       stock_qty: p.stock_qty ?? '',
+      min_stock: p.min_stock ?? '',
       duration_days: p.duration_days ?? '',
       description: p.description || '',
+      benefits: p.benefits || '',
+      ingredients: p.ingredients || '',
+      directions_for_use: p.directions_for_use || '',
+      frequency: p.frequency || '',
+      supplier: p.supplier || '',
+      country: p.country || '',
       allergens: (p.allergens || []).join(', '),
+      tags: (p.tags || []).join(', '),
       is_active: p.is_active !== false,
     });
     setError('');
     setSuccess('');
+  }
+
+  async function approve(p, approval_status) {
+    try {
+      const updated = await apiFetch(`/products/${p.id}/approval`, { method: 'PATCH', body: JSON.stringify({ approval_status }) });
+      setProducts((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   function cancelEdit() {
@@ -214,16 +243,32 @@ export default function ProductManager() {
           <input id="p-category" className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. skincare, supplement" />
         </div>
         <div className="form-field">
+          <label className="field-label" htmlFor="p-subcategory">Subcategory</label>
+          <input id="p-subcategory" className="input" value={form.subcategory} onChange={(e) => setForm({ ...form, subcategory: e.target.value })} />
+        </div>
+        <div className="form-field">
           <label className="field-label" htmlFor="p-sku">SKU</label>
           <input id="p-sku" className="input" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-barcode">Barcode</label>
+          <input id="p-barcode" className="input" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
         </div>
         <div className="form-field">
           <label className="field-label" htmlFor="p-price">Price</label>
           <input id="p-price" className="input" type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
         </div>
         <div className="form-field">
+          <label className="field-label" htmlFor="p-cost">Cost (wholesale, internal only)</label>
+          <input id="p-cost" className="input" type="number" step="0.01" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
+        </div>
+        <div className="form-field">
           <label className="field-label" htmlFor="p-stock">Stock quantity</label>
           <input id="p-stock" className="input" type="number" value={form.stock_qty} onChange={(e) => setForm({ ...form, stock_qty: e.target.value })} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-min-stock">Minimum stock (reorder threshold)</label>
+          <input id="p-min-stock" className="input" type="number" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} />
         </div>
         <div className="form-field">
           <label className="field-label" htmlFor="p-duration">Duration (days)</label>
@@ -234,8 +279,36 @@ export default function ProductManager() {
           <textarea id="p-description" className="textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
         <div className="form-field">
+          <label className="field-label" htmlFor="p-benefits">Benefits</label>
+          <textarea id="p-benefits" className="textarea" value={form.benefits} onChange={(e) => setForm({ ...form, benefits: e.target.value })} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-ingredients">Ingredients</label>
+          <textarea id="p-ingredients" className="textarea" value={form.ingredients} onChange={(e) => setForm({ ...form, ingredients: e.target.value })} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-directions">Directions for use</label>
+          <textarea id="p-directions" className="textarea" value={form.directions_for_use} onChange={(e) => setForm({ ...form, directions_for_use: e.target.value })} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-frequency">Frequency</label>
+          <input id="p-frequency" className="input" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} placeholder="e.g. once daily" />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-supplier">Supplier</label>
+          <input id="p-supplier" className="input" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-country">Country of origin</label>
+          <input id="p-country" className="input" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+        </div>
+        <div className="form-field">
           <label className="field-label" htmlFor="p-allergens">Allergens (comma-separated)</label>
           <input id="p-allergens" className="input" value={form.allergens} onChange={(e) => setForm({ ...form, allergens: e.target.value })} placeholder="e.g. fragrance, nuts" />
+        </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-tags">Tags (comma-separated)</label>
+          <input id="p-tags" className="input" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} />
         </div>
         <label className="field-label">
           <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Visible in the patient-facing shop
@@ -252,6 +325,14 @@ export default function ProductManager() {
         </div>
       </form>
 
+      <div className="tab-group mb-3">
+        {APPROVAL_FILTERS.map((f) => (
+          <button key={f.value} type="button" className={`tab-btn ${approvalFilter === f.value ? 'active' : ''}`} onClick={() => setApprovalFilter(f.value)}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <div className="table-wrap">
         <table className="table">
           <thead>
@@ -263,6 +344,7 @@ export default function ProductManager() {
               <th>Price</th>
               <th>Stock</th>
               <th>Shop</th>
+              <th>Approval</th>
               <th></th>
             </tr>
           </thead>
@@ -277,12 +359,22 @@ export default function ProductManager() {
                 <td>{p.stock_qty ?? '—'}</td>
                 <td>{p.is_active !== false ? 'Visible' : 'Hidden'}</td>
                 <td>
-                  <button className="btn btn-sm btn-secondary" onClick={() => startEdit(p)}>Edit</button>
+                  <span className={`badge badge-status-${p.approval_status || 'published'}`}>
+                    {APPROVAL_LABELS[p.approval_status] || p.approval_status}
+                  </span>
+                </td>
+                <td>
+                  <div className="row-actions">
+                    <button className="btn btn-sm btn-secondary" onClick={() => startEdit(p)}>Edit</button>
+                    {p.approval_status !== 'published' && (
+                      <button className="btn btn-sm btn-primary" onClick={() => approve(p, 'published')}>Approve & publish</button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
             {products.length === 0 && (
-              <tr><td colSpan={8} className="muted">No products yet.</td></tr>
+              <tr><td colSpan={9} className="muted">No products.</td></tr>
             )}
           </tbody>
         </table>

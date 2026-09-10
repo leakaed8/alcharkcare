@@ -18,6 +18,8 @@ const orderRoutes = require('./routes/orders');
 const productRequestRoutes = require('./routes/productRequests');
 const checkinRoutes = require('./routes/checkins');
 const messageRoutes = require('./routes/messages');
+const sheetsSyncRoutes = require('./routes/sheetsSync');
+const { maybeRunAutoSync } = require('./lib/sheetsSyncRunner');
 
 // Last-resort net: a third-party lib (e.g. the OCR worker) throwing outside
 // any promise chain would otherwise crash the whole process for every user
@@ -46,6 +48,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/product-requests', productRequestRoutes);
 app.use('/api/checkins', checkinRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/sheets-sync', sheetsSyncRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -60,3 +63,13 @@ if (process.env.NODE_ENV === 'production') {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Al Chark CRM server listening on port ${PORT}`));
+
+// Auto-sync check: cheap and self-correcting, so a plain interval (not a
+// real job queue) is enough -- see maybeRunAutoSync for why.
+const AUTO_SYNC_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+setInterval(() => {
+  maybeRunAutoSync().catch((err) => console.error('Auto sync check failed:', err.message));
+}, AUTO_SYNC_CHECK_INTERVAL_MS);
+setTimeout(() => {
+  maybeRunAutoSync().catch((err) => console.error('Auto sync check failed:', err.message));
+}, 30_000);
