@@ -105,6 +105,35 @@ async function syncOneRow(row, syncLogId) {
   return { bucket: 'skipped' };
 }
 
+// Lifestyle options are a plain single-column list (just the text, no
+// product-style diffing/conflicts needed) -- upserts by exact text match
+// (case-insensitive) and never deactivates or deletes an option that's
+// disappeared from the sheet; staff turn one off manually if it's no
+// longer wanted. The tab is optional: if it doesn't exist yet, that's not
+// a sync failure, just nothing to do.
+async function syncLifestyleOptions(settings) {
+  const tabName = settings.lifestyle_tab || 'LIFESTYLE';
+  let values;
+  try {
+    values = await readSheetTab(settings.sheet_id, tabName);
+  } catch {
+    return { created: 0, warning: null }; // tab likely doesn't exist -- fine, it's optional
+  }
+  if (!values || values.length < 2) return { created: 0, warning: null };
+
+  const [, ...dataRows] = values; // first row is a header, skip it
+  let created = 0;
+  for (const row of dataRows) {
+    const text = String(row[0] || '').trim();
+    if (!text) continue;
+    const existing = await pool.query('SELECT id FROM lifestyle_options WHERE lower(text) = lower($1)', [text]);
+    if (existing.rows.length > 0) continue;
+    await pool.query(`INSERT INTO lifestyle_options (text, source) VALUES ($1, 'sheet')`, [text]);
+    created += 1;
+  }
+  return { created, warning: created > 0 ? `Lifestyle options: ${created} new from the "${tabName}" tab` : null };
+}
+
 async function runSync({ syncType = 'manual', triggeredByStaffId = null } = {}) {
   if (!isConfigured()) {
     throw new Error('Google Sheets is not configured yet (missing service account credentials).');
@@ -143,6 +172,10 @@ async function runSync({ syncType = 'manual', triggeredByStaffId = null } = {}) 
         errors.push(`Row ${row._row}: ${err.message}`);
       }
     }
+
+    const lifestyleResult = await syncLifestyleOptions(settings);
+    counts.created += lifestyleResult.created;
+    if (lifestyleResult.warning) warnings.push(lifestyleResult.warning);
 
     const status = errors.length > 0
       ? (counts.created + counts.updated + counts.conflicted > 0 ? 'partial' : 'failed')

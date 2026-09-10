@@ -19,6 +19,7 @@ const productRequestRoutes = require('./routes/productRequests');
 const checkinRoutes = require('./routes/checkins');
 const messageRoutes = require('./routes/messages');
 const sheetsSyncRoutes = require('./routes/sheetsSync');
+const lifestyleOptionRoutes = require('./routes/lifestyleOptions');
 const { maybeRunAutoSync } = require('./lib/sheetsSyncRunner');
 
 // Last-resort net: a third-party lib (e.g. the OCR worker) throwing outside
@@ -49,6 +50,7 @@ app.use('/api/product-requests', productRequestRoutes);
 app.use('/api/checkins', checkinRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/sheets-sync', sheetsSyncRoutes);
+app.use('/api/lifestyle-options', lifestyleOptionRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

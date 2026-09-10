@@ -25,6 +25,7 @@ const HEADER_SYNONYMS = {
   country: ['country', 'country of origin', 'origin'],
   allergens: ['allergens', 'allergen', 'allergen warning'],
   tags: ['tags', 'keywords'],
+  image_url: ['image url', 'image', 'photo url', 'picture url', 'photo'],
 };
 
 function normalizeHeader(h) {

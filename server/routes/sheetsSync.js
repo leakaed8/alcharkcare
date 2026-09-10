@@ -29,6 +29,7 @@ router.get('/status', verifyToken, requireRole('staff', 'admin'), asyncHandler(a
     configured: isConfigured(),
     sheet_id: settings.sheet_id || null,
     products_tab: settings.products_tab || 'PRODUCTS',
+    lifestyle_tab: settings.lifestyle_tab || 'LIFESTYLE',
     auto_sync_enabled: settings.auto_sync_enabled || false,
     auto_sync_interval_hours: settings.auto_sync_interval_hours || 24,
     last_sync: lastSyncRows[0] || null,
@@ -41,11 +42,12 @@ router.get('/status', verifyToken, requireRole('staff', 'admin'), asyncHandler(a
 // in server-only env vars and are never exposed through this endpoint.
 // Admin only, since this changes which external source feeds the catalog.
 router.patch('/settings', verifyToken, requireRole('admin'), asyncHandler(async (req, res) => {
-  const { sheet_id, products_tab, auto_sync_enabled, auto_sync_interval_hours } = req.body;
+  const { sheet_id, products_tab, lifestyle_tab, auto_sync_enabled, auto_sync_interval_hours } = req.body;
   const current = await getSettings();
   const next = {
     sheet_id: sheet_id !== undefined ? (sheet_id || null) : current.sheet_id,
     products_tab: products_tab || current.products_tab || 'PRODUCTS',
+    lifestyle_tab: lifestyle_tab || current.lifestyle_tab || 'LIFESTYLE',
     auto_sync_enabled: auto_sync_enabled !== undefined ? !!auto_sync_enabled : (current.auto_sync_enabled || false),
     auto_sync_interval_hours: auto_sync_interval_hours || current.auto_sync_interval_hours || 24,
   };

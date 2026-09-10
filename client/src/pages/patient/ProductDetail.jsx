@@ -71,6 +71,26 @@ export default function ProductDetail() {
       {product.price != null && <p style={{ fontSize: 20, fontWeight: 700, marginTop: 8 }}>${product.price}</p>}
       {product.description && <p className="p-card__body">{product.description}</p>}
 
+      {(product.directions_for_use || product.frequency) && (
+        <div className="p-card mt-2">
+          <p className="p-card__title" style={{ fontSize: 15 }}>How to use</p>
+          {product.frequency && <p className="p-card__body">{product.frequency}</p>}
+          {product.directions_for_use && <p className="p-card__body">{product.directions_for_use}</p>}
+        </div>
+      )}
+      {product.benefits && (
+        <div className="p-card mt-2">
+          <p className="p-card__title" style={{ fontSize: 15 }}>Benefits</p>
+          <p className="p-card__body">{product.benefits}</p>
+        </div>
+      )}
+      {product.ingredients && (
+        <div className="p-card mt-2">
+          <p className="p-card__title" style={{ fontSize: 15 }}>Ingredients</p>
+          <p className="p-card__body">{product.ingredients}</p>
+        </div>
+      )}
+
       {message && <p className="alert alert-success">{message}</p>}
 
       <div className="row-actions mt-3">
