@@ -96,7 +96,7 @@ router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (
 // Patient-facing catalog: active products only, any signed-in user.
 router.get('/catalog', verifyToken, asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, name, brand, category, price, description, image_url, stock_qty, is_active
+    `SELECT id, name, brand, category, price, description, image_url, stock_qty, is_active, tags
      FROM products WHERE is_active = true ORDER BY category, name`
   );
   res.json(rows.map((p) => ({ ...p, availability: computeAvailability(p) })));

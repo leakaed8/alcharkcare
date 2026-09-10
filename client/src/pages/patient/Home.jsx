@@ -141,16 +141,18 @@ export default function Home() {
 
       <p className="p-section-title">Your pharmacist</p>
       <div className="p-card">
-        <p className="p-card__body">Need help with anything?</p>
-        <Link className="p-cta" to="/patient/messages">Ask my pharmacist</Link>
+        {nextFollowup ? (
+          <>
+            <p className="p-card__body">Your pharmacist would like to check in with you.</p>
+            <Link className="p-cta" to="/patient/messages">Talk to my pharmacist</Link>
+          </>
+        ) : (
+          <>
+            <p className="p-card__body">Need help with anything?</p>
+            <Link className="p-cta" to="/patient/messages">Ask my pharmacist</Link>
+          </>
+        )}
       </div>
-
-      {nextFollowup && (
-        <div className="p-card">
-          <p className="p-card__body">Your pharmacist would like to check in with you.</p>
-          <Link className="p-cta p-cta--secondary" to="/patient/messages">Talk to my pharmacist</Link>
-        </div>
-      )}
 
       {plan.recommended.length > 0 && (
         <>
@@ -160,6 +162,7 @@ export default function Home() {
               <div key={item.product_id} className="product-card">
                 {item.image_url && <img src={item.image_url} alt="" />}
                 <strong>{item.product_name}</strong>
+                <p className="muted" style={{ fontSize: 12 }}>{item.reason ? `Why: ${item.reason}` : 'Recommended by your pharmacist'}</p>
                 <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${item.product_id}`}>View product</Link>
               </div>
             ))}

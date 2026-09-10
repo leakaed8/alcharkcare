@@ -1,10 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../api/client';
 import { getCart, setCart as persistCart } from '../lib/cart';
 import AvailabilityBadge from './patient/AvailabilityBadge';
 
 const ORDER_STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', fulfilled: 'Ready/fulfilled', cancelled: 'Cancelled' };
+
+// How staff feature something here: set a product's Brand to "Al Chark"
+// (Product Manager) to put it in "Our own skincare line", or add the
+// "special-offer" tag to put it in "Special offer this month". No
+// dedicated promotions engine yet -- this is a lightweight stand-in until
+// one exists.
+const OWN_BRAND_NAME = 'al chark';
+const SPECIAL_OFFER_TAG = 'special-offer';
 
 // Order-ahead shop: browse the active catalog, build a cart, and submit it
 // as an order. No online payment -- the order is a reservation the patient
@@ -55,6 +63,9 @@ export default function Shop({ patientId }) {
   const cartItems = Object.values(cart);
   const cartTotal = cartItems.reduce((sum, i) => sum + Number(i.product.price || 0) * i.quantity, 0);
 
+  const ownLine = useMemo(() => catalog.filter((p) => (p.brand || '').trim().toLowerCase() === OWN_BRAND_NAME), [catalog]);
+  const specialOffers = useMemo(() => catalog.filter((p) => (p.tags || []).includes(SPECIAL_OFFER_TAG)), [catalog]);
+
   async function checkout() {
     setBusy(true);
     setError('');
@@ -94,6 +105,50 @@ export default function Shop({ patientId }) {
                 {p.price != null && <span className="muted">${p.price}</span>}
                 <AvailabilityBadge availability={p.availability} />
                 {p.reasons.map((r, i) => <p key={i} className="muted" style={{ fontSize: 12 }}>{r}</p>)}
+                <div className="row-actions">
+                  <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${p.id}`}>View</Link>
+                  {p.availability?.level === 'green' || p.availability?.level === 'orange' ? (
+                    <button className="btn btn-sm btn-primary" onClick={() => addToCart(p)}>Add to cart</button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {specialOffers.length > 0 && (
+        <>
+          <p className="field-label">Special offer this month</p>
+          <div className="product-grid mb-3">
+            {specialOffers.map((p) => (
+              <div key={p.id} className="product-card">
+                {p.image_url && <img src={p.image_url} alt={p.name} />}
+                <strong>{p.name}</strong>
+                {p.price != null && <span className="muted">${p.price}</span>}
+                <AvailabilityBadge availability={p.availability} />
+                <div className="row-actions">
+                  <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${p.id}`}>View</Link>
+                  {p.availability?.level === 'green' || p.availability?.level === 'orange' ? (
+                    <button className="btn btn-sm btn-primary" onClick={() => addToCart(p)}>Add to cart</button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {ownLine.length > 0 && (
+        <>
+          <p className="field-label">Our own skincare line</p>
+          <div className="product-grid mb-3">
+            {ownLine.map((p) => (
+              <div key={p.id} className="product-card">
+                {p.image_url && <img src={p.image_url} alt={p.name} />}
+                <strong>{p.name}</strong>
+                {p.price != null && <span className="muted">${p.price}</span>}
+                <AvailabilityBadge availability={p.availability} />
                 <div className="row-actions">
                   <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${p.id}`}>View</Link>
                   {p.availability?.level === 'green' || p.availability?.level === 'orange' ? (

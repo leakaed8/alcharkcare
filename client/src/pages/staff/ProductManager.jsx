@@ -225,6 +225,10 @@ export default function ProductManager() {
         Anything added here becomes available to pick from on the "New visit" form's product/supplement list, and --
         when active -- in the patient-facing shop.
       </p>
+      <p className="muted">
+        Set Brand to "Al Chark" to feature a product under the shop's "Our own skincare line"; add the "special-offer"
+        tag to feature it under "Special offer this month".
+      </p>
 
       <ImportPanel onImported={load} />
 
