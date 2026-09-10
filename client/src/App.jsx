@@ -5,16 +5,20 @@ import StaffLayout from './components/StaffLayout';
 import Login from './pages/Login';
 import FindProducts from './pages/patient/FindProducts';
 import Home from './pages/patient/Home';
-import MyPlan from './pages/patient/MyPlan';
+import Messages from './pages/patient/Messages';
+import MyProgress from './pages/patient/MyProgress';
+import MyRoutine from './pages/patient/MyRoutine';
 import ProductDetail from './pages/patient/ProductDetail';
 import Profile from './pages/patient/Profile';
 import ShopPage from './pages/patient/ShopPage';
 import VisitDetail from './pages/patient/VisitDetail';
 import Visits from './pages/patient/Visits';
+import CheckinQuestions from './pages/staff/CheckinQuestions';
 import FollowupDashboard from './pages/staff/FollowupDashboard';
 import InvoiceScan from './pages/staff/InvoiceScan';
 import LabTestTypeManager from './pages/staff/LabTestTypeManager';
 import ManagerDashboard from './pages/staff/ManagerDashboard';
+import StaffMessages from './pages/staff/Messages';
 import Orders from './pages/staff/Orders';
 import PatientSearch from './pages/staff/PatientSearch';
 import PatientTimeline from './pages/staff/PatientTimeline';
@@ -45,6 +49,8 @@ export default function App() {
         <Route path="product-requests" element={<ProductRequests />} />
         <Route path="products" element={<ProductManager />} />
         <Route path="lab-tests" element={<LabTestTypeManager />} />
+        <Route path="messages" element={<StaffMessages />} />
+        <Route path="checkins" element={<CheckinQuestions />} />
         <Route
           path="manager"
           element={
@@ -66,7 +72,9 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="visits" element={<Visits />} />
         <Route path="visits/:id" element={<VisitDetail />} />
-        <Route path="plan" element={<MyPlan />} />
+        <Route path="routine" element={<MyRoutine />} />
+        <Route path="progress" element={<MyProgress />} />
+        <Route path="messages" element={<Messages />} />
         <Route path="find" element={<FindProducts />} />
         <Route path="shop" element={<ShopPage />} />
         <Route path="shop/:id" element={<ProductDetail />} />

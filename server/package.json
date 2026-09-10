@@ -9,6 +9,7 @@
     "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
     "seed:lab-clinical": "node db/seedLabClinical.js",
+    "seed:checkin-questions": "node db/seedCheckinQuestions.js",
     "set-password": "node db/set-password.js",
     "test": "node --test"
   },

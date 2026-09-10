@@ -12,7 +12,7 @@ services:
     buildCommand: npm run build
     startCommand: npm start
     healthCheckPath: /api/health
-    preDeployCommand: npm run migrate && npm run seed:lab-clinical
+    preDeployCommand: npm run migrate && npm run seed:lab-clinical && npm run seed:checkin-questions
     envVars:
       - key: NODE_ENV
         value: production

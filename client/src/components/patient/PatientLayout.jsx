@@ -1,11 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 
+// Five items, per the product spec -- "My Visits" and "Find Products"
+// still exist as pages, just reached via links from Home/My Routine/Shop
+// rather than taking their own nav slot, so the bar never feels crowded.
 const NAV_ITEMS = [
   { to: '/patient', label: 'Home', icon: '🏠', end: true },
-  { to: '/patient/visits', label: 'Visits', icon: '📋' },
-  { to: '/patient/plan', label: 'Plan', icon: '🌿' },
-  { to: '/patient/find', label: 'Find', icon: '🔍' },
+  { to: '/patient/routine', label: 'My Routine', icon: '🌿' },
+  { to: '/patient/progress', label: 'My Progress', icon: '📈' },
   { to: '/patient/shop', label: 'Shop', icon: '🛍️' },
   { to: '/patient/profile', label: 'Profile', icon: '👤' },
 ];

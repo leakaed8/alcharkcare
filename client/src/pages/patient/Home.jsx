@@ -10,9 +10,13 @@ function greeting() {
   return 'Good evening';
 }
 
-// Groups every product ever recommended/started across all visits into the
-// three buckets the rest of the portal uses, keeping only each product's
-// most recent status (a product recommended twice shouldn't show twice).
+const MOOD_OPTIONS = [
+  { value: 'good', emoji: '🙂', label: 'Good' },
+  { value: 'okay', emoji: '😐', label: 'Okay' },
+  { value: 'difficulty', emoji: '🙁', label: 'Having difficulty' },
+];
+
+// Keeps only each product's most recent status across every visit.
 function summarizePlan(visits) {
   const byProduct = new Map();
   for (const visit of visits) {
@@ -34,10 +38,20 @@ function summarizePlan(visits) {
 export default function Home() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [dueCheckin, setDueCheckin] = useState(undefined); // undefined = loading, null = none due
+  const [reorder, setReorder] = useState([]);
   const [error, setError] = useState('');
+  const [doneToday, setDoneToday] = useState(new Set());
+  const [checkinDone, setCheckinDone] = useState(false);
+
+  function loadDueCheckin() {
+    apiFetch(`/checkins/due/${user.id}`).then(setDueCheckin).catch(() => setDueCheckin(null));
+  }
 
   useEffect(() => {
     apiFetch(`/patients/${user.id}`).then(setData).catch((err) => setError(err.message));
+    apiFetch(`/products/reorder/${user.id}`).then(setReorder).catch(() => {});
+    loadDueCheckin();
   }, [user.id]);
 
   const plan = useMemo(() => (data ? summarizePlan(data.visits) : null), [data]);
@@ -50,84 +64,121 @@ export default function Home() {
       .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))[0] || null;
   }, [data]);
 
-  if (error) return <p className="alert alert-error">{error}</p>;
-  if (!data) return <p className="muted">Loading…</p>;
+  async function markDone(item) {
+    setDoneToday((prev) => new Set(prev).add(item.product_id));
+    apiFetch('/checkins', {
+      method: 'POST',
+      body: JSON.stringify({ visit_product_id: item.id, response_value: 'good', notes: 'Marked done from Home' }),
+    }).catch(() => {});
+  }
 
-  const latestVisit = data.visits[0];
+  async function answerQuickCheckin(value) {
+    setCheckinDone(true);
+    try {
+      await apiFetch('/checkins', {
+        method: 'POST',
+        body: JSON.stringify({ question_id: dueCheckin.question_id, visit_product_id: dueCheckin.visit_product_id, response_value: value }),
+      });
+    } catch {
+      // still show the thank-you state -- a failed background log shouldn't block the patient
+    }
+  }
+
+  if (error) return <p className="alert alert-error">{error}</p>;
+  if (!data || !plan) return <p className="muted">Loading…</p>;
+
   const firstName = (user?.name || '').split(' ')[0];
 
   return (
     <div>
-      <p className="p-greeting">{greeting()}, {firstName}</p>
-      <p className="muted">Here's where things stand with your care at Al Chark.</p>
+      <p className="p-greeting">{greeting()}, {firstName} 👋</p>
 
-      <p className="p-section-title">Latest visit</p>
-      {latestVisit ? (
+      {plan.started.length > 0 && (
+        <>
+          <p className="p-section-title">Your routine today</p>
+          {plan.started.map((item) => (
+            <div key={item.product_id} className="p-card p-card--highlight">
+              <div className="p-routine-row">
+                {item.image_url && <img className="p-routine-row__image" src={item.image_url} alt="" />}
+                <div style={{ flex: 1 }}>
+                  <div className="p-card__title">{item.product_name}</div>
+                  {item.dosing_notes && <p className="muted">{item.dosing_notes}</p>}
+                </div>
+              </div>
+              <button
+                className={`p-cta ${doneToday.has(item.product_id) ? 'p-cta--secondary' : ''}`}
+                onClick={() => markDone(item)}
+                disabled={doneToday.has(item.product_id)}
+              >
+                {doneToday.has(item.product_id) ? '✓ Done' : 'Mark done'}
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+
+      {dueCheckin && !checkinDone && (
+        <>
+          <p className="p-section-title">Quick check-in</p>
+          <div className="p-card">
+            <p className="p-card__body">{dueCheckin.text}</p>
+            <div className="p-mood-row">
+              {(dueCheckin.options || MOOD_OPTIONS).map((opt) => (
+                <button key={opt.value} className="p-mood-btn" onClick={() => answerQuickCheckin(opt.value)}>
+                  <span className="p-mood-btn__emoji">{opt.emoji || '•'}</span>
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+      {checkinDone && (
         <div className="p-card p-card--highlight">
-          <div className="p-card__meta">{new Date(latestVisit.visit_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-          <div className="p-card__title">{latestVisit.complaint || 'Consultation'}</div>
-          <p className="p-card__body">
-            {latestVisit.patient_summary || 'Your pharmacist reviewed your visit. Ask in-store for more detail on what was discussed.'}
-          </p>
-          <Link className="p-cta" to="/patient/visits">View visit summary →</Link>
-        </div>
-      ) : (
-        <div className="p-card p-empty">
-          <div className="p-empty__icon">🩺</div>
-          <p>You don't have any recorded visits yet.</p>
+          <p className="p-card__body">Thanks for letting us know! 🙏</p>
         </div>
       )}
 
-      <p className="p-section-title">Your current plan</p>
-      {plan && (plan.started.length > 0 || plan.recommended.length > 0) ? (
-        <div className="p-card">
-          {plan.started.slice(0, 3).map((p) => (
-            <div key={p.product_id} className="p-card__body" style={{ marginBottom: 10 }}>
-              <b>{p.product_name}</b> <span className="badge badge-status-started">Started</span>
-              {p.dosing_notes && <div className="muted">{p.dosing_notes}</div>}
-            </div>
-          ))}
-          {plan.recommended.slice(0, 2).map((p) => (
-            <div key={p.product_id} className="p-card__body" style={{ marginBottom: 10 }}>
-              <b>{p.product_name}</b> <span className="badge badge-status-recommended">Recommended</span>
-            </div>
-          ))}
-          <Link className="p-cta p-cta--secondary" to="/patient/plan">View my plan →</Link>
-        </div>
-      ) : (
-        <div className="p-card p-empty">
-          <p>Your pharmacist hasn't added any recommendations yet.</p>
-        </div>
-      )}
-
-      <p className="p-section-title">Upcoming follow-up</p>
-      {nextFollowup ? (
-        <div className="p-card">
-          <div className="p-card__title">{new Date(nextFollowup.scheduled_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-          <p className="p-card__body">Follow-up recommended to review your response to your current plan.</p>
-          <Link className="p-cta p-cta--secondary" to="/patient/visits">View follow-up →</Link>
-        </div>
-      ) : (
-        <div className="p-card p-empty">
-          <p>No follow-up scheduled right now.</p>
-        </div>
-      )}
-
-      <p className="p-section-title">Quick actions</p>
-      <div className="p-quick-actions">
-        <Link className="p-quick-action" to="/patient/find">
-          <span className="p-quick-action__icon">🔍</span> Find a Product
-        </Link>
-        <Link className="p-quick-action" to="/patient/find">
-          <span className="p-quick-action__icon">💬</span> Ask About a Product
-        </Link>
-        <Link className="p-quick-action" to="/patient/visits">
-          <span className="p-quick-action__icon">📋</span> View My Visits
-        </Link>
-        <Link className="p-quick-action" to="/patient/find">
-          <span className="p-quick-action__icon">📞</span> Contact Al Chark
-        </Link>
+      <p className="p-section-title">Your pharmacist</p>
+      <div className="p-card">
+        <p className="p-card__body">Need help with anything?</p>
+        <Link className="p-cta" to="/patient/messages">Ask my pharmacist</Link>
       </div>
+
+      {nextFollowup && (
+        <div className="p-card">
+          <p className="p-card__body">Your pharmacist would like to check in with you.</p>
+          <Link className="p-cta p-cta--secondary" to="/patient/messages">Talk to my pharmacist</Link>
+        </div>
+      )}
+
+      {plan.recommended.length > 0 && (
+        <>
+          <p className="p-section-title">Recommended for you</p>
+          <div className="product-grid">
+            {plan.recommended.slice(0, 4).map((item) => (
+              <div key={item.product_id} className="product-card">
+                {item.image_url && <img src={item.image_url} alt="" />}
+                <strong>{item.product_name}</strong>
+                <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${item.product_id}`}>View product</Link>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {reorder.length > 0 && (
+        <>
+          <p className="p-section-title">Running low?</p>
+          {reorder.map((item) => (
+            <div key={item.id} className="p-card">
+              <div className="p-card__title">{item.name}</div>
+              <p className="muted">{item.days_remaining <= 0 ? 'You may have run out' : `About ${item.days_remaining} day${item.days_remaining === 1 ? '' : 's'} left`}</p>
+              <Link className="p-cta" to={`/patient/shop/${item.id}`}>Reorder</Link>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

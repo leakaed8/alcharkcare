@@ -31,6 +31,47 @@ function computeAvailability(product) {
   return { level: 'green', label: 'Available at Al Chark' };
 }
 
+// "Running low?" reorder suggestions -- estimates when a product a patient
+// is using will run out, from whichever is more recent: the routine item's
+// started_date, or their last purchase of it. Only products with a known
+// duration_days (how long a supply lasts) can be estimated; nothing is
+// guessed for products without one. Flags anything due within a week
+// (including already overdue) as worth a reorder nudge.
+router.get('/reorder/:patientId', verifyToken, asyncHandler(async (req, res) => {
+  const { patientId } = req.params;
+  const isStaff = req.user.role === 'staff' || req.user.role === 'admin';
+  if (!isStaff && String(req.user.id) !== String(patientId)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const { rows } = await pool.query(
+    `WITH anchors AS (
+       SELECT vp.product_id, vp.started_date AS anchor_date
+       FROM visit_products vp JOIN visits v ON v.id = vp.visit_id
+       WHERE v.patient_id = $1 AND vp.status = 'started' AND vp.started_date IS NOT NULL
+       UNION ALL
+       SELECT pu.product_id, pu.purchased_at::date AS anchor_date
+       FROM purchases pu
+       WHERE pu.patient_id = $1 AND pu.product_id IS NOT NULL
+     ),
+     latest AS (
+       SELECT product_id, MAX(anchor_date) AS anchor_date FROM anchors GROUP BY product_id
+     )
+     SELECT p.id, p.name, p.brand, p.category, p.price, p.image_url, p.stock_qty, p.is_active,
+            l.anchor_date, p.duration_days,
+            (l.anchor_date + (p.duration_days || ' days')::interval)::date AS estimated_runout_date,
+            ((l.anchor_date + (p.duration_days || ' days')::interval)::date - CURRENT_DATE) AS days_remaining
+     FROM latest l
+     JOIN products p ON p.id = l.product_id
+     WHERE p.duration_days IS NOT NULL AND p.is_active = true
+       AND (l.anchor_date + (p.duration_days || ' days')::interval)::date <= CURRENT_DATE + INTERVAL '7 days'
+     ORDER BY days_remaining ASC`,
+    [patientId]
+  );
+
+  res.json(rows.map((p) => ({ ...p, availability: computeAvailability(p) })));
+}));
+
 // Full product list for staff catalog management. Staff only.
 router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(`SELECT ${SELECT_COLUMNS} FROM products ORDER BY name`);
