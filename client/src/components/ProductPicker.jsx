@@ -6,8 +6,9 @@ import { apiFetch } from '../api/client';
 // inline "create new" option adds it to the catalog (POST /api/products)
 // and selects it immediately.
 //
-// `items` is [{ product_id, dosing_notes }] rather than a plain id array so
-// each selected product can carry its own instructions.
+// `items` is [{ product_id, dosing_notes, duration_days, refill_enabled }]
+// rather than a plain id array so each selected product can carry its own
+// instructions, supply duration, and refill-reminder setting.
 export default function ProductPicker({ products, items, onChange, onProductCreated }) {
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
@@ -22,7 +23,7 @@ export default function ProductPicker({ products, items, onChange, onProductCrea
     if (selectedIds.includes(id)) {
       onChange(items.filter((i) => i.product_id !== id));
     } else {
-      onChange([...items, { product_id: id, dosing_notes: '', reason: '' }]);
+      onChange([...items, { product_id: id, dosing_notes: '', reason: '', duration_days: '', refill_enabled: true }]);
     }
   }
 
@@ -30,12 +31,8 @@ export default function ProductPicker({ products, items, onChange, onProductCrea
     onChange(items.filter((i) => i.product_id !== id));
   }
 
-  function updateNotes(id, dosing_notes) {
-    onChange(items.map((i) => (i.product_id === id ? { ...i, dosing_notes } : i)));
-  }
-
-  function updateReason(id, reason) {
-    onChange(items.map((i) => (i.product_id === id ? { ...i, reason } : i)));
+  function updateItem(id, patch) {
+    onChange(items.map((i) => (i.product_id === id ? { ...i, ...patch } : i)));
   }
 
   async function createAndSelect() {
@@ -44,7 +41,7 @@ export default function ProductPicker({ products, items, onChange, onProductCrea
     try {
       const product = await apiFetch('/products', { method: 'POST', body: JSON.stringify({ name: query.trim() }) });
       onProductCreated(product);
-      onChange([...items, { product_id: product.id, dosing_notes: '', reason: '' }]);
+      onChange([...items, { product_id: product.id, dosing_notes: '', reason: '', duration_days: '', refill_enabled: true }]);
       setQuery('');
     } catch (err) {
       setError(err.message);
@@ -78,14 +75,33 @@ export default function ProductPicker({ products, items, onChange, onProductCrea
                   className="input input-sm"
                   placeholder="How to use it (e.g. twice daily after cleansing)"
                   value={item.dosing_notes}
-                  onChange={(e) => updateNotes(item.product_id, e.target.value)}
+                  onChange={(e) => updateItem(item.product_id, { dosing_notes: e.target.value })}
                 />
                 <input
                   className="input input-sm"
                   placeholder="Why recommended (shown to the patient, optional)"
                   value={item.reason || ''}
-                  onChange={(e) => updateReason(item.product_id, e.target.value)}
+                  onChange={(e) => updateItem(item.product_id, { reason: e.target.value })}
                 />
+                <div className="row-actions">
+                  <input
+                    className="input input-sm"
+                    type="number"
+                    min="1"
+                    style={{ maxWidth: 160 }}
+                    placeholder={`Duration (days)${product?.duration_days ? ` -- default ${product.duration_days}` : ''}`}
+                    value={item.duration_days ?? ''}
+                    onChange={(e) => updateItem(item.product_id, { duration_days: e.target.value })}
+                  />
+                  <label className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={item.refill_enabled !== false}
+                      onChange={(e) => updateItem(item.product_id, { refill_enabled: e.target.checked })}
+                    />
+                    Refill reminders
+                  </label>
+                </div>
               </div>
             );
           })}

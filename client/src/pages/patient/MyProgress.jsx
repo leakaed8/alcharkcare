@@ -5,7 +5,6 @@ import LabScanner from '../../components/LabScanner';
 
 const TABS = [
   { key: 'photos', label: 'Photos' },
-  { key: 'checkins', label: 'Check-ins' },
   { key: 'labs', label: 'Lab check-ins' },
 ];
 
@@ -164,42 +163,6 @@ function PhotosTab({ patientId }) {
   );
 }
 
-const RESPONSE_EMOJI = { good: '🙂', okay: '😐', difficulty: '🙁' };
-
-function CheckinsTab({ patientId }) {
-  const [checkins, setCheckins] = useState(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    apiFetch(`/checkins/${patientId}`).then(setCheckins).catch((err) => setError(err.message));
-  }, [patientId]);
-
-  if (error) return <p className="alert alert-error">{error}</p>;
-  if (!checkins) return <p className="muted">Loading…</p>;
-  if (checkins.length === 0) {
-    return (
-      <div className="p-card p-empty">
-        <p>No check-ins yet. They'll show up here as you use your routine.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {checkins.map((c) => (
-        <div key={c.id} className="p-card">
-          <div className="p-card__head-row">
-            <div className="p-card__title">{RESPONSE_EMOJI[c.response_value] || '•'} {c.response_label || c.response_value}</div>
-            <span className="muted">{new Date(c.created_at).toLocaleDateString()}</span>
-          </div>
-          {c.question_text && <p className="muted">{c.question_text}</p>}
-          {c.notes && <p className="p-card__body">{c.notes}</p>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function LabsTab({ patientId }) {
   const [labData, setLabData] = useState(null);
 
@@ -241,14 +204,13 @@ export default function MyProgress() {
 
   const tabContent = useMemo(() => {
     if (tab === 'photos') return <PhotosTab patientId={user.id} />;
-    if (tab === 'checkins') return <CheckinsTab patientId={user.id} />;
     return <LabsTab patientId={user.id} />;
   }, [tab, user.id]);
 
   return (
     <div>
       <p className="p-greeting">My progress</p>
-      <p className="muted">Your photos, check-ins, and lab history, all in one place.</p>
+      <p className="muted">Your photos and lab history, all in one place.</p>
 
       <div className="p-tabs">
         {TABS.map((t) => (

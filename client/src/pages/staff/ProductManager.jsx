@@ -5,6 +5,7 @@ const EMPTY_FORM = {
   name: '', brand: '', category: '', subcategory: '', sku: '', barcode: '', price: '', cost: '',
   stock_qty: '', min_stock: '', duration_days: '', description: '', benefits: '', ingredients: '',
   directions_for_use: '', frequency: '', supplier: '', country: '', allergens: '', tags: '', is_active: true,
+  reminder_frequency: 'none', daily_reminder_message: '',
 };
 
 const APPROVAL_LABELS = { draft: 'Draft', review_required: 'Needs review', approved: 'Approved', published: 'Published' };
@@ -173,6 +174,8 @@ export default function ProductManager() {
       allergens: (p.allergens || []).join(', '),
       tags: (p.tags || []).join(', '),
       is_active: p.is_active !== false,
+      reminder_frequency: p.reminder_frequency || 'none',
+      daily_reminder_message: p.daily_reminder_message || '',
     });
     setError('');
     setSuccess('');
@@ -314,6 +317,30 @@ export default function ProductManager() {
           <label className="field-label" htmlFor="p-tags">Tags (comma-separated)</label>
           <input id="p-tags" className="input" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} />
         </div>
+        <div className="form-field">
+          <label className="field-label" htmlFor="p-reminder-frequency">Patient reminders</label>
+          <select
+            id="p-reminder-frequency"
+            className="input"
+            value={form.reminder_frequency}
+            onChange={(e) => setForm({ ...form, reminder_frequency: e.target.value })}
+          >
+            <option value="none">None</option>
+            <option value="daily">Daily, while a patient is using this product</option>
+          </select>
+        </div>
+        {form.reminder_frequency === 'daily' && (
+          <div className="form-field">
+            <label className="field-label" htmlFor="p-reminder-message">Daily reminder message</label>
+            <input
+              id="p-reminder-message"
+              className="input"
+              value={form.daily_reminder_message}
+              onChange={(e) => setForm({ ...form, daily_reminder_message: e.target.value })}
+              placeholder="e.g. Don't forget your sunscreen today"
+            />
+          </div>
+        )}
         <label className="field-label">
           <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Visible in the patient-facing shop
         </label>

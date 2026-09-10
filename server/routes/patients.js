@@ -164,7 +164,9 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
                   'dosing_notes', vp.dosing_notes,
                   'status', vp.status,
                   'reason', vp.reason,
-                  'started_date', vp.started_date
+                  'started_date', vp.started_date,
+                  'reminder_frequency', p.reminder_frequency,
+                  'daily_reminder_message', p.daily_reminder_message
                 ) ORDER BY vp.id
               ) FILTER (WHERE vp.id IS NOT NULL AND (vp.patient_visible OR $2)), '[]'
             ) AS products

@@ -17,6 +17,7 @@ const SYNCED_FIELDS = [
   'name', 'brand', 'category', 'subcategory', 'sku', 'barcode', 'price', 'cost',
   'stock_qty', 'min_stock', 'duration_days', 'description', 'benefits', 'ingredients',
   'directions_for_use', 'frequency', 'supplier', 'country', 'allergens', 'tags', 'image_url',
+  'reminder_frequency', 'daily_reminder_message',
 ];
 
 function coerceValue(field, raw) {

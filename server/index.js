@@ -20,7 +20,11 @@ const checkinRoutes = require('./routes/checkins');
 const messageRoutes = require('./routes/messages');
 const sheetsSyncRoutes = require('./routes/sheetsSync');
 const lifestyleOptionRoutes = require('./routes/lifestyleOptions');
+const telegramRoutes = require('./routes/telegram');
+const refillRoutes = require('./routes/refillChecks');
 const { maybeRunAutoSync } = require('./lib/sheetsSyncRunner');
+const { registerWebhook } = require('./lib/telegramNotify');
+const { maybeNotifyDueFollowups, maybeSendDailyReminders } = require('./lib/scheduledNotifier');
 
 // Last-resort net: a third-party lib (e.g. the OCR worker) throwing outside
 // any promise chain would otherwise crash the whole process for every user
@@ -51,6 +55,8 @@ app.use('/api/checkins', checkinRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/sheets-sync', sheetsSyncRoutes);
 app.use('/api/lifestyle-options', lifestyleOptionRoutes);
+app.use('/api/telegram', telegramRoutes);
+app.use('/api/refill-checks', refillRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -66,6 +72,8 @@ if (process.env.NODE_ENV === 'production') {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Al Chark CRM server listening on port ${PORT}`));
 
+registerWebhook().catch((err) => console.error('Telegram webhook registration failed:', err.message));
+
 // Auto-sync check: cheap and self-correcting, so a plain interval (not a
 // real job queue) is enough -- see maybeRunAutoSync for why.
 const AUTO_SYNC_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -75,3 +83,15 @@ setInterval(() => {
 setTimeout(() => {
   maybeRunAutoSync().catch((err) => console.error('Auto sync check failed:', err.message));
 }, 30_000);
+
+// Daily jobs (due follow-ups, product reminders, refill prompts): each is
+// internally gated to run at most once per Beirut calendar day, so a
+// hourly interval tick is just "has today's run happened yet?", not a
+// real cron schedule -- see scheduledNotifier.js for why that's enough.
+const DAILY_JOB_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+function runDailyJobs() {
+  maybeNotifyDueFollowups().catch((err) => console.error('Follow-up notify check failed:', err.message));
+  maybeSendDailyReminders().catch((err) => console.error('Daily reminder check failed:', err.message));
+}
+setInterval(runDailyJobs, DAILY_JOB_CHECK_INTERVAL_MS);
+setTimeout(runDailyJobs, 45_000);

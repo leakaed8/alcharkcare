@@ -26,6 +26,8 @@ const HEADER_SYNONYMS = {
   allergens: ['allergens', 'allergen', 'allergen warning'],
   tags: ['tags', 'keywords'],
   image_url: ['image url', 'image', 'photo url', 'picture url', 'photo'],
+  reminder_frequency: ['reminder frequency', 'reminder'],
+  daily_reminder_message: ['daily reminder message', 'daily reminder', 'reminder message'],
 };
 
 function normalizeHeader(h) {

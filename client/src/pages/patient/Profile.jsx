@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { apiFetch } from '../../api/client';
+import { enablePushNotifications, disablePushNotifications, pushSupported } from '../../lib/push';
 
 const CONTACT_METHODS = [
   { value: 'phone', label: 'Phone call' },
@@ -15,10 +16,36 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pushMsg, setPushMsg] = useState('');
 
   useEffect(() => {
     apiFetch(`/patients/${user.id}`).then((d) => setPatient(d.patient)).catch((err) => setError(err.message));
   }, [user.id]);
+
+  async function handleEnablePush() {
+    setPushMsg('');
+    try {
+      const { publicKey } = await apiFetch('/orders/push/vapid-public-key');
+      if (!publicKey) {
+        setPushMsg('Notifications are not set up yet -- check back soon.');
+        return;
+      }
+      await enablePushNotifications(publicKey);
+      setPushMsg('Notifications turned on for this device.');
+    } catch (err) {
+      setPushMsg(err.message);
+    }
+  }
+
+  async function handleDisablePush() {
+    setPushMsg('');
+    try {
+      await disablePushNotifications();
+      setPushMsg('Notifications turned off for this device.');
+    } catch (err) {
+      setPushMsg(err.message);
+    }
+  }
 
   async function updateContactMethod(value) {
     setSaving(true);
@@ -79,6 +106,20 @@ export default function Profile() {
         </div>
         {message && <p className="muted">{message}</p>}
       </div>
+
+      {pushSupported() && (
+        <>
+          <p className="p-section-title">Notifications</p>
+          <div className="p-card">
+            <p className="p-card__body">Get reminders for your routine and refills, right on this device.</p>
+            <div className="row-actions mt-2">
+              <button className="p-cta p-cta--secondary" onClick={handleEnablePush}>Turn on notifications</button>
+              <button className="p-cta p-cta--secondary" onClick={handleDisablePush}>Turn off</button>
+            </div>
+            {pushMsg && <p className="muted">{pushMsg}</p>}
+          </div>
+        </>
+      )}
 
       <button className="p-cta p-cta--secondary mt-3" onClick={logout}>Log out</button>
     </div>

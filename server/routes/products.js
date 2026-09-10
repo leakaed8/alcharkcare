@@ -23,7 +23,9 @@ const SELECT_COLUMNS = 'id, name, brand, category, sku, price, stock_qty, durati
 // the approval workflow state, and internal-only figures (cost, supplier)
 // that never belong on a patient-facing response.
 const STAFF_SELECT_COLUMNS = `${SELECT_COLUMNS}, subcategory, barcode, cost, min_stock, supplier, country, tags,
-  benefits, ingredients, directions_for_use, frequency, recommendation_eligible, approval_status, last_synced_at, updated_at`;
+  benefits, ingredients, directions_for_use, frequency, recommendation_eligible, approval_status, last_synced_at, updated_at,
+  reminder_frequency, daily_reminder_message`;
+const REMINDER_FREQUENCIES = ['none', 'daily'];
 // Patient-facing product detail: the safe columns plus the descriptive,
 // catalog-level "how to use it" fields -- never the internal-only ones
 // (cost, supplier, barcode, etc) that STAFF_SELECT_COLUMNS carries.
@@ -370,7 +372,7 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
   const {
     name, brand, category, subcategory, sku, barcode, price, cost, stock_qty, min_stock, duration_days,
     description, benefits, ingredients, directions_for_use, frequency, supplier, country,
-    allergens, tags, recommendation_eligible, is_active,
+    allergens, tags, recommendation_eligible, is_active, reminder_frequency, daily_reminder_message,
   } = req.body;
 
   if (sku) {
@@ -378,6 +380,9 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'A product with this SKU already exists' });
     }
+  }
+  if (reminder_frequency && !REMINDER_FREQUENCIES.includes(reminder_frequency)) {
+    return res.status(400).json({ error: `reminder_frequency must be one of ${REMINDER_FREQUENCIES.join(', ')}` });
   }
 
   const toList = (value) => (value == null ? null : Array.isArray(value) ? value : String(value).split(',').map((a) => a.trim().toLowerCase()).filter(Boolean));
@@ -408,14 +413,17 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
        tags = COALESCE($20, tags),
        recommendation_eligible = COALESCE($21, recommendation_eligible),
        is_active = COALESCE($22, is_active),
+       reminder_frequency = COALESCE($23, reminder_frequency),
+       daily_reminder_message = COALESCE($24, daily_reminder_message),
        updated_at = now()
-     WHERE id = $23
+     WHERE id = $25
      RETURNING ${STAFF_SELECT_COLUMNS}`,
     [
       name || null, brand || null, category || null, subcategory || null, sku || null, barcode || null,
       price ?? null, cost ?? null, stock_qty ?? null, min_stock ?? null, duration_days ?? null,
       description || null, benefits || null, ingredients || null, directions_for_use || null, frequency || null,
-      supplier || null, country || null, allergenList, tagList, recommendation_eligible ?? null, is_active ?? null, id,
+      supplier || null, country || null, allergenList, tagList, recommendation_eligible ?? null, is_active ?? null,
+      reminder_frequency || null, daily_reminder_message || null, id,
     ]
   );
 
