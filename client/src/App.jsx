@@ -13,6 +13,7 @@ import Profile from './pages/patient/Profile';
 import ShopPage from './pages/patient/ShopPage';
 import VisitDetail from './pages/patient/VisitDetail';
 import Visits from './pages/patient/Visits';
+import ExpiringSoon from './pages/staff/ExpiringSoon';
 import FollowupDashboard from './pages/staff/FollowupDashboard';
 import GoogleSheetsSync from './pages/staff/GoogleSheetsSync';
 import InvoiceScan from './pages/staff/InvoiceScan';
@@ -24,6 +25,7 @@ import PatientSearch from './pages/staff/PatientSearch';
 import PatientTimeline from './pages/staff/PatientTimeline';
 import ProductManager from './pages/staff/ProductManager';
 import ProductRequests from './pages/staff/ProductRequests';
+import Promotions from './pages/staff/Promotions';
 import RefillRequests from './pages/staff/RefillRequests';
 import VisitEntry from './pages/staff/VisitEntry';
 
@@ -50,6 +52,8 @@ export default function App() {
         <Route path="product-requests" element={<ProductRequests />} />
         <Route path="refill-requests" element={<RefillRequests />} />
         <Route path="products" element={<ProductManager />} />
+        <Route path="expiring-soon" element={<ExpiringSoon />} />
+        <Route path="promotions" element={<Promotions />} />
         <Route path="lab-tests" element={<LabTestTypeManager />} />
         <Route path="messages" element={<StaffMessages />} />
         <Route path="sheets-sync" element={<GoogleSheetsSync />} />

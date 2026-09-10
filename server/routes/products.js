@@ -6,6 +6,7 @@ const upload = require('../lib/upload');
 const asyncHandler = require('../lib/asyncHandler');
 const { parseProductWorkbook } = require('../lib/productImport');
 const { uploadProductImage, isConfigured: cloudinaryConfigured } = require('../lib/cloudinaryUpload');
+const { attachPricing } = require('../lib/pricingLookup');
 
 const router = express.Router();
 
@@ -81,7 +82,7 @@ router.get('/reorder/:patientId', verifyToken, asyncHandler(async (req, res) => 
     [patientId]
   );
 
-  res.json(rows.map((p) => ({ ...p, availability: computeAvailability(p) })));
+  res.json(await attachPricing(rows.map((p) => ({ ...p, availability: computeAvailability(p) }))));
 }));
 
 // Full product list for staff catalog management. Staff only. Optional
@@ -96,7 +97,7 @@ router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (
     `SELECT ${STAFF_SELECT_COLUMNS} FROM products WHERE ($1::text IS NULL OR approval_status = $1) ORDER BY name`,
     [approval_status || null]
   );
-  res.json(rows);
+  res.json(await attachPricing(rows));
 }));
 
 // Patient-facing catalog: active products only, any signed-in user.
@@ -105,7 +106,7 @@ router.get('/catalog', verifyToken, asyncHandler(async (req, res) => {
     `SELECT id, name, brand, category, price, description, image_url, stock_qty, is_active, tags
      FROM products WHERE is_active = true ORDER BY category, name`
   );
-  res.json(rows.map((p) => ({ ...p, availability: computeAvailability(p) })));
+  res.json(await attachPricing(rows.map((p) => ({ ...p, availability: computeAvailability(p) }))));
 }));
 
 // Patient-facing product search -- includes inactive products (as GRAY
@@ -122,7 +123,7 @@ router.get('/search', verifyToken, asyncHandler(async (req, res) => {
      ORDER BY is_active DESC, name LIMIT 40`,
     [`%${q}%`]
   );
-  res.json(rows.map((p) => ({ ...p, availability: computeAvailability(p) })));
+  res.json(await attachPricing(rows.map((p) => ({ ...p, availability: computeAvailability(p) }))));
 }));
 
 // Suggested products for a patient: matched by skin/hair type and by
@@ -184,7 +185,7 @@ router.get('/suggestions/:patientId', verifyToken, asyncHandler(async (req, res)
       return { id: p.id, name: p.name, brand: p.brand, category: p.category, price: p.price, description: p.description, image_url: p.image_url, availability: computeAvailability(p), reasons };
     });
 
-  res.json(suggestions);
+  res.json(await attachPricing(suggestions));
 }));
 
 // Product detail. Any signed-in user. If this patient was personally
@@ -224,11 +225,13 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
     [product.category, id]
   );
 
+  const [pricedProduct] = await attachPricing([{ ...product, availability: computeAvailability(product) }]);
+  const pricedRelated = await attachPricing(related.map((p) => ({ ...p, availability: computeAvailability(p) })));
+
   res.json({
-    ...product,
-    availability: computeAvailability(product),
+    ...pricedProduct,
     recommendation,
-    related_products: related.map((p) => ({ ...p, availability: computeAvailability(p) })),
+    related_products: pricedRelated,
   });
 }));
 

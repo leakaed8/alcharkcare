@@ -3,16 +3,16 @@ import { Link } from 'react-router-dom';
 import { apiFetch } from '../api/client';
 import { getCart, setCart as persistCart } from '../lib/cart';
 import AvailabilityBadge from './patient/AvailabilityBadge';
+import PriceDisplay from './patient/PriceDisplay';
 
 const ORDER_STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', fulfilled: 'Ready/fulfilled', cancelled: 'Cancelled' };
 
 // How staff feature something here: set a product's Brand to "Al Chark"
-// (Product Manager) to put it in "Our own skincare line", or add the
-// "special-offer" tag to put it in "Special offer this month". No
-// dedicated promotions engine yet -- this is a lightweight stand-in until
-// one exists.
+// (Product Manager) to put it in "Our own skincare line". "Special offer
+// this month" is sourced from whatever the pricing engine actually
+// discounted (an active promotion or expiration-clearance rule) -- not a
+// manually-applied tag -- so it's never out of sync with the real price.
 const OWN_BRAND_NAME = 'al chark';
-const SPECIAL_OFFER_TAG = 'special-offer';
 
 // Order-ahead shop: browse the active catalog, build a cart, and submit it
 // as an order. No online payment -- the order is a reservation the patient
@@ -25,6 +25,7 @@ export default function Shop({ patientId }) {
   const [suggestions, setSuggestions] = useState([]);
   const [orders, setOrders] = useState([]);
   const [cart, setCart] = useState(() => getCart(patientId));
+  const [cartPricing, setCartPricing] = useState(null);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -33,6 +34,20 @@ export default function Shop({ patientId }) {
   useEffect(() => {
     persistCart(patientId, cart);
   }, [cart, patientId]);
+
+  // Runs the exact same pricing engine checkout uses, so the total shown
+  // here always matches what's actually charged -- never a separately
+  // computed (and possibly conflicting) client-side total.
+  useEffect(() => {
+    const items = Object.values(cart).map((i) => ({ product_id: i.product.id, quantity: i.quantity }));
+    if (items.length === 0) {
+      setCartPricing(null);
+      return;
+    }
+    apiFetch('/orders/cart-preview', { method: 'POST', body: JSON.stringify({ items }) })
+      .then(setCartPricing)
+      .catch(() => setCartPricing(null));
+  }, [cart]);
 
   function loadOrders() {
     apiFetch(`/orders/${patientId}`).then(setOrders).catch((err) => setError(err.message));
@@ -61,10 +76,11 @@ export default function Shop({ patientId }) {
   }
 
   const cartItems = Object.values(cart);
-  const cartTotal = cartItems.reduce((sum, i) => sum + Number(i.product.price || 0) * i.quantity, 0);
+  const cartLineByProductId = useMemo(() => new Map((cartPricing?.items || []).map((i) => [i.product_id, i])), [cartPricing]);
+  const cartTotal = cartPricing?.total ?? cartItems.reduce((sum, i) => sum + Number(i.product.price || 0) * i.quantity, 0);
 
   const ownLine = useMemo(() => catalog.filter((p) => (p.brand || '').trim().toLowerCase() === OWN_BRAND_NAME), [catalog]);
-  const specialOffers = useMemo(() => catalog.filter((p) => (p.tags || []).includes(SPECIAL_OFFER_TAG)), [catalog]);
+  const specialOffers = useMemo(() => catalog.filter((p) => p.pricing?.discount), [catalog]);
 
   async function checkout() {
     setBusy(true);
@@ -102,7 +118,7 @@ export default function Shop({ patientId }) {
               <div key={p.id} className="product-card">
                 {p.image_url && <img src={p.image_url} alt={p.name} />}
                 <strong>{p.name}</strong>
-                {p.price != null && <span className="muted">${p.price}</span>}
+                <PriceDisplay pricing={p.pricing} price={p.price} />
                 <AvailabilityBadge availability={p.availability} />
                 {p.reasons.map((r, i) => <p key={i} className="muted" style={{ fontSize: 12 }}>{r}</p>)}
                 <div className="row-actions">
@@ -125,7 +141,7 @@ export default function Shop({ patientId }) {
               <div key={p.id} className="product-card">
                 {p.image_url && <img src={p.image_url} alt={p.name} />}
                 <strong>{p.name}</strong>
-                {p.price != null && <span className="muted">${p.price}</span>}
+                <PriceDisplay pricing={p.pricing} price={p.price} />
                 <AvailabilityBadge availability={p.availability} />
                 <div className="row-actions">
                   <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${p.id}`}>View</Link>
@@ -147,7 +163,7 @@ export default function Shop({ patientId }) {
               <div key={p.id} className="product-card">
                 {p.image_url && <img src={p.image_url} alt={p.name} />}
                 <strong>{p.name}</strong>
-                {p.price != null && <span className="muted">${p.price}</span>}
+                <PriceDisplay pricing={p.pricing} price={p.price} />
                 <AvailabilityBadge availability={p.availability} />
                 <div className="row-actions">
                   <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${p.id}`}>View</Link>
@@ -169,7 +185,7 @@ export default function Shop({ patientId }) {
             <strong>{p.name}</strong>
             {p.brand && <span className="muted">{p.brand}</span>}
             <span className="muted">{p.category}</span>
-            {p.price != null && <span>${p.price}</span>}
+            <PriceDisplay pricing={p.pricing} price={p.price} />
             <AvailabilityBadge availability={p.availability} />
             <div className="row-actions">
               <Link className="btn btn-sm btn-secondary" to={`/patient/shop/${p.id}`}>View</Link>
@@ -185,20 +201,32 @@ export default function Shop({ patientId }) {
       {cartItems.length > 0 && (
         <div className="card mb-3">
           <p className="field-label">Your cart</p>
-          {cartItems.map((i) => (
-            <div key={i.product.id} className="row-actions mb-2">
-              <span style={{ flex: 1 }}>{i.product.name}</span>
-              <input
-                className="input"
-                type="number"
-                min="0"
-                style={{ width: 70 }}
-                value={i.quantity}
-                onChange={(e) => updateQuantity(i.product.id, Number(e.target.value))}
-              />
-              <span className="muted">${(Number(i.product.price || 0) * i.quantity).toFixed(2)}</span>
-            </div>
-          ))}
+          {cartItems.map((i) => {
+            const line = cartLineByProductId.get(i.product.id);
+            return (
+              <div key={i.product.id} className="mb-2">
+                <div className="row-actions">
+                  <span style={{ flex: 1 }}>{i.product.name}</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    style={{ width: 70 }}
+                    value={i.quantity}
+                    onChange={(e) => updateQuantity(i.product.id, Number(e.target.value))}
+                  />
+                  <span className="muted">
+                    ${(line ? line.line_total : Number(i.product.price || 0) * i.quantity).toFixed(2)}
+                  </span>
+                </div>
+                {line?.free_or_discounted_units > 0 && (
+                  <p className="muted" style={{ fontSize: 12 }}>
+                    Includes {line.free_or_discounted_units} unit{line.free_or_discounted_units === 1 ? '' : 's'} at a promotional discount ({line.bogo_promotion?.name}).
+                  </p>
+                )}
+              </div>
+            );
+          })}
           <textarea className="textarea" placeholder="Notes for pickup (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
           <div className="row-actions mt-2">
             <strong>Total: ${cartTotal.toFixed(2)}</strong>
