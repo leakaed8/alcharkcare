@@ -10,6 +10,90 @@ function StatCard({ label, value }) {
   );
 }
 
+function TelegramConnect() {
+  const [status, setStatus] = useState(null);
+  const [deepLink, setDeepLink] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    apiFetch('/telegram/status').then(setStatus).catch((err) => setError(err.message));
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  // Once a deep link is showing, poll for the webhook having recorded the
+  // link -- the admin's action (opening Telegram, hitting Start) happens
+  // outside this tab, so there's no other way to know it completed.
+  useEffect(() => {
+    if (!deepLink) return;
+    const interval = setInterval(load, 3000);
+    return () => clearInterval(interval);
+  }, [deepLink]);
+
+  useEffect(() => {
+    if (status?.linked) setDeepLink(null);
+  }, [status]);
+
+  async function connect() {
+    setBusy(true);
+    setError('');
+    try {
+      const data = await apiFetch('/telegram/connect', { method: 'POST' });
+      setDeepLink(data.deep_link);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    setError('');
+    try {
+      await apiFetch('/telegram/disconnect', { method: 'POST' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!status) return null;
+
+  return (
+    <div className="card mb-5">
+      <p className="field-label">Telegram notifications</p>
+      {!status.bot_configured && (
+        <p className="alert alert-error">Not available yet -- set TELEGRAM_BOT_TOKEN on the server first.</p>
+      )}
+      {status.bot_configured && status.linked && (
+        <>
+          <p className="alert alert-success">Connected -- staff notifications (new messages, patient-reported problems, refill requests, sync issues) are sent here.</p>
+          <button className="btn btn-sm btn-ghost" onClick={disconnect} disabled={busy}>Disconnect</button>
+        </>
+      )}
+      {status.bot_configured && !status.linked && !deepLink && (
+        <>
+          <p className="muted">Not connected yet. This links one shared Telegram chat for the whole pharmacy.</p>
+          <button className="btn btn-secondary" onClick={connect} disabled={busy}>Connect Telegram</button>
+        </>
+      )}
+      {deepLink && (
+        <>
+          <p className="muted">Open Telegram and tap Start to finish connecting -- this updates automatically.</p>
+          <a className="btn btn-primary" href={deepLink} target="_blank" rel="noreferrer">Open Telegram</a>
+        </>
+      )}
+      {error && <p className="alert alert-error">{error}</p>}
+    </div>
+  );
+}
+
 export default function ManagerDashboard() {
   const [overview, setOverview] = useState(null);
   const [segments, setSegments] = useState(null);
@@ -28,6 +112,8 @@ export default function ManagerDashboard() {
       <div className="page-header">
         <h2>Manager overview</h2>
       </div>
+
+      <TelegramConnect />
 
       <div className="stat-grid">
         <StatCard label="Total patients" value={overview.total_patients} />

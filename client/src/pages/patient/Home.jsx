@@ -10,11 +10,77 @@ function greeting() {
   return 'Good evening';
 }
 
-const MOOD_OPTIONS = [
-  { value: 'good', emoji: '🙂', label: 'Good' },
-  { value: 'okay', emoji: '😐', label: 'Okay' },
-  { value: 'difficulty', emoji: '🙁', label: 'Having difficulty' },
+const NO_REASONS = [
+  { value: 'product_problem', label: 'A problem with the product' },
+  { value: 'too_expensive', label: 'It\'s too expensive' },
+  { value: 'switching_product', label: 'Switching to something else' },
+  { value: 'other', label: 'Other' },
 ];
+
+function RefillPrompt({ refill, onDone }) {
+  const [step, setStep] = useState('ask'); // ask | reason | done
+  const [busy, setBusy] = useState(false);
+
+  async function respond(body) {
+    setBusy(true);
+    try {
+      await apiFetch(`/refill-checks/${refill.id}/respond`, { method: 'POST', body: JSON.stringify(body) });
+      setStep('done');
+      setTimeout(onDone, 1500);
+    } catch {
+      // fall through -- the card just stays interactive rather than getting stuck
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (step === 'done') {
+    return (
+      <div className="p-card p-card--highlight">
+        <p className="p-card__body">Thanks for letting us know! 🙏</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-card p-card--highlight">
+      <div className="p-routine-row">
+        {refill.image_url && <img className="p-routine-row__image" src={refill.image_url} alt="" />}
+        <div style={{ flex: 1 }}>
+          <div className="p-card__title">Running low on {refill.product_name}?</div>
+        </div>
+      </div>
+      {step === 'ask' && (
+        <div className="p-mood-row">
+          <button className="p-mood-btn" disabled={busy} onClick={() => respond({ response: 'yes' })}>
+            <span className="p-mood-btn__emoji">✅</span>
+            <span>Yes, I need one</span>
+          </button>
+          <button className="p-mood-btn" disabled={busy} onClick={() => respond({ response: 'snooze', snooze_days: 7 })}>
+            <span className="p-mood-btn__emoji">⏰</span>
+            <span>Remind me later</span>
+          </button>
+          <button className="p-mood-btn" disabled={busy} onClick={() => setStep('reason')}>
+            <span className="p-mood-btn__emoji">✖️</span>
+            <span>No</span>
+          </button>
+        </div>
+      )}
+      {step === 'reason' && (
+        <>
+          <p className="muted mt-2">Mind telling us why?</p>
+          <div className="p-mood-row">
+            {NO_REASONS.map((r) => (
+              <button key={r.value} className="p-mood-btn" disabled={busy} onClick={() => respond({ response: 'no', no_reason: r.value })}>
+                <span>{r.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // Keeps only each product's most recent status across every visit.
 function summarizePlan(visits) {
@@ -38,23 +104,27 @@ function summarizePlan(visits) {
 export default function Home() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
-  const [dueCheckin, setDueCheckin] = useState(undefined); // undefined = loading, null = none due
   const [reorder, setReorder] = useState([]);
+  const [dueRefill, setDueRefill] = useState(undefined); // undefined = loading, null = none due
   const [error, setError] = useState('');
   const [doneToday, setDoneToday] = useState(new Set());
-  const [checkinDone, setCheckinDone] = useState(false);
 
-  function loadDueCheckin() {
-    apiFetch(`/checkins/due/${user.id}`).then(setDueCheckin).catch(() => setDueCheckin(null));
+  function loadDueRefill() {
+    apiFetch(`/refill-checks/due/${user.id}`).then(setDueRefill).catch(() => setDueRefill(null));
   }
 
   useEffect(() => {
     apiFetch(`/patients/${user.id}`).then(setData).catch((err) => setError(err.message));
     apiFetch(`/products/reorder/${user.id}`).then(setReorder).catch(() => {});
-    loadDueCheckin();
+    loadDueRefill();
   }, [user.id]);
 
   const plan = useMemo(() => (data ? summarizePlan(data.visits) : null), [data]);
+
+  const dailyReminders = useMemo(() => {
+    if (!plan) return [];
+    return plan.started.filter((i) => i.reminder_frequency === 'daily' && i.daily_reminder_message);
+  }, [plan]);
 
   const nextFollowup = useMemo(() => {
     if (!data) return null;
@@ -70,18 +140,6 @@ export default function Home() {
       method: 'POST',
       body: JSON.stringify({ visit_product_id: item.id, response_value: 'good', notes: 'Marked done from Home' }),
     }).catch(() => {});
-  }
-
-  async function answerQuickCheckin(value) {
-    setCheckinDone(true);
-    try {
-      await apiFetch('/checkins', {
-        method: 'POST',
-        body: JSON.stringify({ question_id: dueCheckin.question_id, visit_product_id: dueCheckin.visit_product_id, response_value: value }),
-      });
-    } catch {
-      // still show the thank-you state -- a failed background log shouldn't block the patient
-    }
   }
 
   if (error) return <p className="alert alert-error">{error}</p>;
@@ -117,26 +175,21 @@ export default function Home() {
         </>
       )}
 
-      {dueCheckin && !checkinDone && (
+      {dailyReminders.length > 0 && (
         <>
-          <p className="p-section-title">Quick check-in</p>
-          <div className="p-card">
-            <p className="p-card__body">{dueCheckin.text}</p>
-            <div className="p-mood-row">
-              {(dueCheckin.options || MOOD_OPTIONS).map((opt) => (
-                <button key={opt.value} className="p-mood-btn" onClick={() => answerQuickCheckin(opt.value)}>
-                  <span className="p-mood-btn__emoji">{opt.emoji || '•'}</span>
-                  <span>{opt.label}</span>
-                </button>
-              ))}
+          {dailyReminders.map((item) => (
+            <div key={item.product_id} className="p-card">
+              <p className="p-card__body">🔔 {item.daily_reminder_message}</p>
             </div>
-          </div>
+          ))}
         </>
       )}
-      {checkinDone && (
-        <div className="p-card p-card--highlight">
-          <p className="p-card__body">Thanks for letting us know! 🙏</p>
-        </div>
+
+      {dueRefill && (
+        <>
+          <p className="p-section-title">Refill check</p>
+          <RefillPrompt refill={dueRefill} onDone={loadDueRefill} />
+        </>
       )}
 
       <p className="p-section-title">Your pharmacist</p>

@@ -68,9 +68,13 @@ router.post('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async 
     for (const item of products || []) {
       const status = VALID_PRODUCT_STATUSES.includes(item.status) ? item.status : 'recommended';
       await client.query(
-        `INSERT INTO visit_products (visit_id, product_id, is_supplement, dosing_notes, reason, status)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [visit.id, item.product_id, item.is_supplement || false, item.dosing_notes || null, item.reason || null, status]
+        `INSERT INTO visit_products (visit_id, product_id, is_supplement, dosing_notes, reason, status, duration_days, refill_enabled)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          visit.id, item.product_id, item.is_supplement || false, item.dosing_notes || null, item.reason || null, status,
+          item.duration_days === '' || item.duration_days == null ? null : Number(item.duration_days),
+          item.refill_enabled !== false,
+        ]
       );
     }
 

@@ -1,6 +1,6 @@
 const pool = require('../db/pool');
 const { sendPush, isConfigured: pushConfigured } = require('./pushNotify');
-const { sendTelegramMessage, isConfigured: telegramConfigured } = require('./telegramNotify');
+const { sendTelegramMessage } = require('./telegramNotify');
 
 // The one shared notification service for staff-facing alerts (new order,
 // patient-reported problem, new message, ...) -- every feature that needs
@@ -8,9 +8,7 @@ const { sendTelegramMessage, isConfigured: telegramConfigured } = require('./tel
 // fan-out. Best-effort: a delivery failure here must never fail the
 // action that triggered it, so every step is caught individually.
 async function notifyStaff(text, { url = '/staff', title = 'Al Chark' } = {}) {
-  if (telegramConfigured()) {
-    await sendTelegramMessage(text).catch((err) => console.error('Telegram notify error:', err.message));
-  }
+  await sendTelegramMessage(text).catch((err) => console.error('Telegram notify error:', err.message));
 
   if (pushConfigured()) {
     try {
