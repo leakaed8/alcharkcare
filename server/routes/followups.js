@@ -11,17 +11,20 @@ const router = express.Router();
 router.get('/', verifyToken, requireRole('staff', 'admin'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT f.id, f.scheduled_date, f.sent_date, f.response, f.patient_comment, f.staff_note, f.status,
+            f.reason, f.assigned_staff_id, s.name AS assigned_staff_name,
             v.id AS visit_id, v.complaint, f.lab_result_id,
             p.id AS patient_id, p.name AS patient_name, p.phone AS patient_phone,
             CASE
               WHEN f.status != 'pending' THEN f.status
               WHEN f.scheduled_date < CURRENT_DATE THEN 'overdue'
               WHEN f.scheduled_date = CURRENT_DATE THEN 'due_today'
+              WHEN f.scheduled_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'this_week'
               ELSE 'upcoming'
             END AS dashboard_status
      FROM followups f
      LEFT JOIN visits v ON v.id = f.visit_id
      LEFT JOIN lab_results lr ON lr.id = f.lab_result_id
+     LEFT JOIN staff s ON s.id = f.assigned_staff_id
      JOIN patients p ON p.id = COALESCE(v.patient_id, lr.patient_id)
      WHERE f.status != 'closed'
      ORDER BY f.scheduled_date ASC`
@@ -58,7 +61,7 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
   if (!/^\d+$/.test(id)) {
     return res.status(400).json({ error: 'Invalid follow-up id' });
   }
-  const { response, patient_comment, status } = req.body;
+  const { response, patient_comment, status, reason, assigned_staff_id } = req.body;
 
   const validResponses = ['better', 'same', 'worse', 'no_response'];
   if (response && !validResponses.includes(response)) {
@@ -70,11 +73,13 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
      SET response = COALESCE($1, response),
          patient_comment = COALESCE($2, patient_comment),
          status = COALESCE($3, status),
+         reason = COALESCE($4, reason),
+         assigned_staff_id = COALESCE($5, assigned_staff_id),
          sent_date = COALESCE(sent_date, now()),
-         logged_by_staff_id = $4
-     WHERE id = $5
+         logged_by_staff_id = $6
+     WHERE id = $7
      RETURNING *`,
-    [response || null, patient_comment || null, status || null, req.user.id, id]
+    [response || null, patient_comment || null, status || null, reason || null, assigned_staff_id || null, req.user.id, id]
   );
 
   if (rows.length === 0) {

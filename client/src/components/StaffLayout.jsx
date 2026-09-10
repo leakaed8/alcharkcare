@@ -15,10 +15,13 @@ export default function StaffLayout() {
           <NavLink to="/staff/patients">Patients</NavLink>
           <NavLink to="/staff/visits/new">New visit</NavLink>
           <NavLink to="/staff/followups">Follow-ups</NavLink>
+          <NavLink to="/staff/messages">Messages</NavLink>
+          <NavLink to="/staff/checkins">Check-ins</NavLink>
           <NavLink to="/staff/orders">Orders</NavLink>
           <NavLink to="/staff/product-requests">Requests</NavLink>
           <NavLink to="/staff/products">Products</NavLink>
           <NavLink to="/staff/lab-tests">Lab tests</NavLink>
+          <NavLink to="/staff/sheets-sync">Sheets Sync</NavLink>
           {user?.role === 'admin' && <NavLink to="/staff/manager">Manager</NavLink>}
         </nav>
         <div className="app-header__spacer" />

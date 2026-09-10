@@ -37,15 +37,19 @@ router.post('/', verifyToken, upload.single('image'), asyncHandler(async (req, r
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const { visit_id, body_area, notes } = req.body;
+  const { visit_id, body_area, notes, category } = req.body;
+  const validCategories = ['acne', 'pigmentation', 'redness', 'texture', 'hair', 'skin', 'other'];
+  if (category && !validCategories.includes(category)) {
+    return res.status(400).json({ error: `category must be one of ${validCategories.join(', ')}` });
+  }
   const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
   const uploadedBy = req.user.role === 'patient' ? 'patient' : 'staff';
 
   const { rows } = await pool.query(
-    `INSERT INTO progress_photos (patient_id, visit_id, photo_url, body_area, uploaded_by, notes)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, taken_date, body_area, uploaded_by, notes`,
-    [patientId, visit_id && isValidId(visit_id) ? visit_id : null, dataUri, body_area || null, uploadedBy, notes || null]
+    `INSERT INTO progress_photos (patient_id, visit_id, photo_url, body_area, category, uploaded_by, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, taken_date, body_area, category, uploaded_by, notes`,
+    [patientId, visit_id && isValidId(visit_id) ? visit_id : null, dataUri, body_area || null, category || null, uploadedBy, notes || null]
   );
   res.status(201).json(rows[0]);
 }));
@@ -62,7 +66,7 @@ router.get('/:patientId', verifyToken, asyncHandler(async (req, res) => {
   }
 
   const { rows } = await pool.query(
-    `SELECT id, visit_id, photo_url, body_area, taken_date, uploaded_by, notes
+    `SELECT id, visit_id, photo_url, body_area, category, taken_date, uploaded_by, notes
      FROM progress_photos WHERE patient_id = $1 ORDER BY taken_date DESC, id DESC`,
     [patientId]
   );

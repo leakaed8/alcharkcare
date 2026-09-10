@@ -10,6 +10,7 @@
     "migrate": "npm run migrate --prefix server",
     "seed": "npm run seed --prefix server",
     "seed:lab-clinical": "npm run seed:lab-clinical --prefix server",
+    "seed:checkin-questions": "npm run seed:checkin-questions --prefix server",
     "build": "npm install --prefix client && npm run build --prefix client && npm install --prefix server",
     "start": "npm start --prefix server",
     "dev:server": "npm run dev --prefix server",

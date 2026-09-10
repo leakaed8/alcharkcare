@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { apiFetch } from '../../api/client';
 import CarePlanList from '../../components/CarePlanList';
-import LabScanner from '../../components/LabScanner';
 
 const TABS = [
   { key: 'current', label: 'Current' },
@@ -11,11 +10,7 @@ const TABS = [
   { key: 'previous', label: 'Previous' },
 ];
 
-const LAB_STATUS_PLAIN = {
-  NORMAL_BY_LAB: "Within your lab's reference range",
-  LOW: "Below your lab's reference range",
-  HIGH: "Above your lab's reference range",
-};
+const STATUS_LABELS = { started: 'Started', paused: 'Paused', completed: 'Completed' };
 
 // Keeps only each product's most recent status across every visit, so a
 // product recommended twice (or started then later completed) shows once.
@@ -26,28 +21,97 @@ function groupProducts(visits) {
       if (!p.product_id) continue;
       const existing = byProduct.get(p.product_id);
       if (!existing || new Date(visit.visit_date) > new Date(existing.visit_date)) {
-        byProduct.set(p.product_id, { ...p, visit_date: visit.visit_date });
+        byProduct.set(p.product_id, { ...p, visit_date: visit.visit_date, category: p.category });
       }
     }
   }
   const items = [...byProduct.values()];
   return {
-    current: items.filter((i) => i.status === 'started'),
+    current: items.filter((i) => i.status === 'started' || i.status === 'paused'),
     recommended: items.filter((i) => i.status === 'recommended'),
     previous: items.filter((i) => i.status === 'completed' || i.status === 'cancelled'),
   };
 }
 
-export default function MyPlan() {
+function groupByCategory(items) {
+  const groups = {};
+  for (const item of items) {
+    const key = item.category || 'Your routine';
+    (groups[key] = groups[key] || []).push(item);
+  }
+  return groups;
+}
+
+function RoutineItem({ item, onChanged }) {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  async function setStatus(status) {
+    setBusy(true);
+    setMsg('');
+    try {
+      await apiFetch(`/visits/products/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      onChanged();
+    } catch (err) {
+      setMsg(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reportDifficulty() {
+    setBusy(true);
+    setMsg('');
+    try {
+      await apiFetch('/checkins', {
+        method: 'POST',
+        body: JSON.stringify({ visit_product_id: item.id, response_value: 'difficulty', notes: `Reported from ${item.product_name}` }),
+      });
+      setMsg('Thanks -- your pharmacist has been notified.');
+    } catch (err) {
+      setMsg(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="p-card">
+      <div className="p-card__head-row">
+        <div className="p-card__title">{item.product_name}</div>
+        <span className={`badge badge-status-${item.status}`}>{STATUS_LABELS[item.status] || item.status}</span>
+      </div>
+      {item.dosing_notes && <p className="p-card__body">{item.dosing_notes}</p>}
+      {item.reason && <p className="muted">Why: {item.reason}</p>}
+      {msg && <p className="muted">{msg}</p>}
+      <div className="row-actions mt-2">
+        {item.status === 'started' && (
+          <button className="p-cta p-cta--secondary" disabled={busy} onClick={() => setStatus('paused')}>Pause</button>
+        )}
+        {item.status === 'paused' && (
+          <button className="p-cta p-cta--secondary" disabled={busy} onClick={() => setStatus('started')}>Resume</button>
+        )}
+        <button className="p-cta p-cta--secondary" disabled={busy} onClick={() => setStatus('completed')}>Mark completed</button>
+        <button className="p-cta p-cta--secondary" disabled={busy} onClick={reportDifficulty}>Report difficulty</button>
+        <Link className="p-cta p-cta--secondary" to="/patient/messages">Ask pharmacist</Link>
+      </div>
+    </div>
+  );
+}
+
+export default function MyRoutine() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
-  const [labData, setLabData] = useState(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('current');
 
-  useEffect(() => {
+  function load() {
     apiFetch(`/patients/${user.id}`).then(setData).catch((err) => setError(err.message));
-    apiFetch(`/labs/${user.id}`).then(setLabData).catch(() => {});
+  }
+
+  useEffect(() => {
+    load();
   }, [user.id]);
 
   const groups = useMemo(() => (data ? groupProducts(data.visits) : null), [data]);
@@ -56,10 +120,11 @@ export default function MyPlan() {
   if (!data || !groups) return <p className="muted">Loading…</p>;
 
   const items = groups[tab];
+  const byCategory = tab === 'current' ? groupByCategory(items) : null;
 
   return (
     <div>
-      <p className="p-greeting">My plan</p>
+      <p className="p-greeting">My routine</p>
       <p className="muted">Everything your pharmacist has recommended, in one place.</p>
 
       <p className="p-section-title">Care plan</p>
@@ -82,7 +147,14 @@ export default function MyPlan() {
         </div>
       )}
 
-      {items.map((p) => (
+      {tab === 'current' && byCategory && Object.entries(byCategory).map(([category, categoryItems]) => (
+        <div key={category}>
+          <p className="p-subsection-title">{category.toUpperCase()}</p>
+          {categoryItems.map((item) => <RoutineItem key={item.product_id} item={item} onChanged={load} />)}
+        </div>
+      ))}
+
+      {tab !== 'current' && items.map((p) => (
         <div key={p.product_id} className="p-card">
           <div className="p-card__title">{p.product_name}</div>
           <p className="muted">
@@ -98,26 +170,6 @@ export default function MyPlan() {
           </div>
         </div>
       ))}
-
-      <p className="p-section-title">Lab check-ins</p>
-      <p className="muted">See if a product you're taking looks like it's helping your levels.</p>
-      <LabScanner onScanned={() => apiFetch(`/labs/${user.id}`).then(setLabData)} />
-
-      {labData?.results.map((lab) => (
-        <div key={lab.id} className="p-card">
-          <div className="p-card__meta">{new Date(lab.scanned_at).toLocaleDateString()}</div>
-          {lab.markers.map((m) => (
-            <div key={m.id} className="mb-2">
-              <b>{m.label}</b>{' '}
-              <span className={`badge badge-severity-${(m.lab_status || 'unknown').toLowerCase()}`}>
-                {m.lab_status ? LAB_STATUS_PLAIN[m.lab_status] : 'No reference range on file'}
-              </span>
-              <div className="muted">{m.insight}</div>
-            </div>
-          ))}
-        </div>
-      ))}
-      {labData?.disclaimer && <p className="disclaimer">{labData.disclaimer}</p>}
     </div>
   );
 }

@@ -1,17 +1,30 @@
 const ExcelJS = require('exceljs');
 
 // Accepts a variety of common header spellings so staff don't have to
-// massage their existing spreadsheet to match our exact column names.
+// massage their existing spreadsheet to match our exact column names. Also
+// reused by the Google Sheets sync (googleSheetsSync.js) so both import
+// paths recognize the same column names.
 const HEADER_SYNONYMS = {
   name: ['name', 'product name', 'product', 'item', 'item name'],
   brand: ['brand', 'manufacturer', 'maker'],
   category: ['category', 'type'],
+  subcategory: ['subcategory', 'sub-category', 'sub category'],
   sku: ['sku', 'code', 'item code', 'product code'],
-  price: ['price', 'unit price', 'cost', 'sale price'],
+  barcode: ['barcode', 'upc', 'ean'],
+  price: ['price', 'unit price', 'sale price', 'selling price'],
+  cost: ['cost', 'wholesale cost', 'cost price'],
   stock_qty: ['stock', 'stock qty', 'quantity', 'qty', 'stock quantity', 'inventory'],
+  min_stock: ['min stock', 'minimum stock', 'reorder level', 'min stock level'],
   duration_days: ['duration', 'duration days', 'duration (days)', 'days supply'],
   description: ['description', 'desc', 'notes'],
+  benefits: ['benefits', 'benefit'],
+  ingredients: ['ingredients', 'ingredient list'],
+  directions_for_use: ['directions', 'directions for use', 'administration', 'how to use'],
+  frequency: ['frequency', 'usage frequency'],
+  supplier: ['supplier', 'vendor'],
+  country: ['country', 'country of origin', 'origin'],
   allergens: ['allergens', 'allergen', 'allergen warning'],
+  tags: ['tags', 'keywords'],
 };
 
 function normalizeHeader(h) {
@@ -65,4 +78,4 @@ async function parseProductWorkbook(buffer) {
   return { rows, unmatchedHeaders };
 }
 
-module.exports = { parseProductWorkbook };
+module.exports = { parseProductWorkbook, matchField, normalizeHeader };

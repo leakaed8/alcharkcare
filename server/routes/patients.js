@@ -158,6 +158,8 @@ router.get('/:id', verifyToken, asyncHandler(async (req, res) => {
                   'id', vp.id,
                   'product_id', vp.product_id,
                   'product_name', p.name,
+                  'category', p.category,
+                  'image_url', p.image_url,
                   'is_supplement', vp.is_supplement,
                   'dosing_notes', vp.dosing_notes,
                   'status', vp.status,
