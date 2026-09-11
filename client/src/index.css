@@ -272,19 +272,56 @@ fieldset.field-fieldset legend {
   font-size: 14px;
 }
 
-.app-header__nav {
+.app-header__menu-toggle {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--white);
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.app-header__nav {
+  display: none;
   gap: 4px;
   flex-wrap: wrap;
 }
 
+.app-header__nav--open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--teal-600);
+  padding: 8px 12px 16px;
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+}
+
 .app-header__nav a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 600;
+}
+
+.app-header__nav-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .app-header__nav a:hover {
@@ -295,6 +332,28 @@ fieldset.field-fieldset legend {
 .app-header__nav a.active {
   background: rgba(255, 255, 255, 0.22);
   color: var(--white);
+}
+
+@media (min-width: 860px) {
+  .app-header__menu-toggle {
+    display: none;
+  }
+  .app-header__nav {
+    display: flex;
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    background: none;
+    padding: 0;
+    box-shadow: none;
+    margin-left: 0;
+  }
+  .app-header__nav a {
+    padding: 8px 12px;
+  }
+  .app-header__nav-icon {
+    display: none;
+  }
 }
 
 .nav-badge {
