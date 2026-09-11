@@ -5,7 +5,7 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const upload = require('../lib/upload');
 const asyncHandler = require('../lib/asyncHandler');
 const { parseProductWorkbook } = require('../lib/productImport');
-const { uploadProductImage, isConfigured: cloudinaryConfigured } = require('../lib/cloudinaryUpload');
+const { uploadProductImage, isConfigured: imageHostConfigured } = require('../lib/imgbbUpload');
 const { attachPricing } = require('../lib/pricingLookup');
 
 const router = express.Router();
@@ -304,16 +304,16 @@ router.post('/import', verifyToken, requireRole('staff', 'admin'), spreadsheetUp
   res.json({ preview: false, unmatchedHeaders, ...results });
 }));
 
-// Upload/replace a product's photo. Stored on a free image host
-// (Cloudinary) -- only the resulting URL is saved here, never the image
-// bytes, so this doesn't grow the app's own database or disk. Staff/admin only.
+// Upload/replace a product's photo. Stored on a free image host (ImgBB)
+// -- only the resulting URL is saved here, never the image bytes, so this
+// doesn't grow the app's own database or disk. Staff/admin only.
 router.post('/:id/image', verifyToken, requireRole('staff', 'admin'), upload.single('image'), asyncHandler(async (req, res) => {
   const { id } = req.params;
   if (!req.file) {
     return res.status(400).json({ error: 'image is required' });
   }
-  if (!cloudinaryConfigured()) {
-    return res.status(503).json({ error: 'Image hosting is not configured yet (set CLOUDINARY_URL on the server).' });
+  if (!imageHostConfigured()) {
+    return res.status(503).json({ error: 'Image hosting is not configured yet (set IMGBB_API_KEY on the server).' });
   }
 
   const existing = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
