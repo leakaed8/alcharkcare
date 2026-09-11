@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { apiFetch } from '../../api/client';
 import { addToCart } from '../../lib/cart';
 import AvailabilityBadge from '../../components/patient/AvailabilityBadge';
+import PriceDisplay from '../../components/patient/PriceDisplay';
 
 function AskAboutProduct({ prefill }) {
   const [text, setText] = useState(prefill || '');
@@ -94,7 +95,7 @@ export default function FindProducts() {
             <div style={{ flex: 1 }}>
               <div className="p-card__title">{p.name}</div>
               {p.brand && <div className="muted">{p.brand}</div>}
-              {p.price != null && <div>${p.price}</div>}
+              <PriceDisplay pricing={p.pricing} price={p.price} />
               <div style={{ marginTop: 6 }}><AvailabilityBadge availability={p.availability} /></div>
             </div>
           </div>

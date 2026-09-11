@@ -3,6 +3,8 @@ const pool = require('../db/pool');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../lib/asyncHandler');
 const { notifyStaffOfNewOrder } = require('../lib/orderNotify');
+const { attachPricing } = require('../lib/pricingLookup');
+const { computeCartLineTotal } = require('../lib/pricingEngine');
 
 const router = express.Router();
 
@@ -47,20 +49,34 @@ router.post('/', verifyToken, asyncHandler(async (req, res) => {
   }
 
   const productIds = items.map((i) => Number(i.product_id));
-  const { rows: products } = await pool.query(
-    'SELECT id, name, price, stock_qty, is_active FROM products WHERE id = ANY($1::int[])',
+  const { rows: rawProducts } = await pool.query(
+    'SELECT id, name, price, category, brand, stock_qty, is_active FROM products WHERE id = ANY($1::int[])',
     [productIds]
   );
-  const byId = new Map(products.map((p) => [p.id, p]));
 
-  const unavailable = items.filter((i) => !byId.get(Number(i.product_id))?.is_active);
+  const unavailable = items.filter((i) => !rawProducts.find((p) => p.id === Number(i.product_id))?.is_active);
   if (unavailable.length > 0) {
     return res.status(400).json({ error: 'One or more items are no longer available', unavailable: unavailable.map((i) => i.product_id) });
   }
 
+  // Same pricing engine every product-returning endpoint uses -- the total
+  // charged at checkout is computed the same way the cart displayed it,
+  // per item quantity (so a promotion's min_quantity/BOGO math sees the
+  // real quantity being purchased, not the default of 1).
+  const quantities = new Map(items.map((i) => [Number(i.product_id), Number(i.quantity)]));
+  const pricedProducts = await attachPricing(rawProducts, quantities);
+  const byId = new Map(pricedProducts.map((p) => [p.id, p]));
+
+  const lineTotals = new Map();
   const total = items.reduce((sum, i) => {
     const product = byId.get(Number(i.product_id));
-    return sum + Number(product.price || 0) * Number(i.quantity);
+    const { line_total } = computeCartLineTotal({
+      unitPrice: product.pricing.unit_price,
+      quantity: Number(i.quantity),
+      bogoPromotion: product.pricing.bogo_promotion,
+    });
+    lineTotals.set(Number(i.product_id), line_total);
+    return sum + line_total;
   }, 0);
 
   const client = await pool.connect();
@@ -74,10 +90,16 @@ router.post('/', verifyToken, asyncHandler(async (req, res) => {
 
     for (const item of items) {
       const product = byId.get(Number(item.product_id));
+      const quantity = Number(item.quantity);
+      // The effective per-unit price actually charged for this line
+      // (line_total / quantity) -- for a BOGO line this is the blended
+      // average across paid + free/discounted units, so unit_price *
+      // quantity always reconciles with what was charged.
+      const effectiveUnitPrice = Math.round((lineTotals.get(Number(item.product_id)) / quantity) * 100) / 100;
       await client.query(
         `INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price)
          VALUES ($1, $2, $3, $4, $5)`,
-        [order.id, product.id, product.name, Number(item.quantity), product.price]
+        [order.id, product.id, product.name, quantity, effectiveUnitPrice]
       );
     }
     await client.query('COMMIT');
@@ -94,6 +116,50 @@ router.post('/', verifyToken, asyncHandler(async (req, res) => {
   } finally {
     client.release();
   }
+}));
+
+// Cart pricing preview -- runs the exact same pricing engine calls
+// checkout uses, so the cart the patient sees before placing an order
+// always matches what they'd actually be charged. Any signed-in user.
+router.post('/cart-preview', verifyToken, asyncHandler(async (req, res) => {
+  const items = (req.body.items || []).filter((i) => i.product_id && Number(i.quantity) > 0);
+  if (items.length === 0) {
+    return res.json({ items: [], total: 0 });
+  }
+
+  const productIds = items.map((i) => Number(i.product_id));
+  const { rows: rawProducts } = await pool.query(
+    'SELECT id, name, price, category, brand, stock_qty, is_active FROM products WHERE id = ANY($1::int[])',
+    [productIds]
+  );
+  const quantities = new Map(items.map((i) => [Number(i.product_id), Number(i.quantity)]));
+  const pricedProducts = await attachPricing(rawProducts, quantities);
+  const byId = new Map(pricedProducts.map((p) => [p.id, p]));
+
+  let total = 0;
+  const lineItems = items.map((i) => {
+    const product = byId.get(Number(i.product_id));
+    if (!product) return null;
+    const quantity = Number(i.quantity);
+    const { line_total, free_or_discounted_units } = computeCartLineTotal({
+      unitPrice: product.pricing.unit_price,
+      quantity,
+      bogoPromotion: product.pricing.bogo_promotion,
+    });
+    total += line_total;
+    return {
+      product_id: product.id,
+      quantity,
+      unit_price: product.pricing.unit_price,
+      original_price: product.pricing.original_price,
+      discount: product.pricing.discount,
+      bogo_promotion: product.pricing.bogo_promotion,
+      free_or_discounted_units,
+      line_total,
+    };
+  }).filter(Boolean);
+
+  res.json({ items: lineItems, total: Math.round(total * 100) / 100 });
 }));
 
 // Pending-orders queue for staff -- same pattern as the follow-up

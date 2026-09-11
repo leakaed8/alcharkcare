@@ -22,6 +22,9 @@ const sheetsSyncRoutes = require('./routes/sheetsSync');
 const lifestyleOptionRoutes = require('./routes/lifestyleOptions');
 const telegramRoutes = require('./routes/telegram');
 const refillRoutes = require('./routes/refillChecks');
+const batchRoutes = require('./routes/batches');
+const expirationDiscountRuleRoutes = require('./routes/expirationDiscountRules');
+const promotionRoutes = require('./routes/promotions');
 const { maybeRunAutoSync } = require('./lib/sheetsSyncRunner');
 const { registerWebhook } = require('./lib/telegramNotify');
 const { maybeNotifyDueFollowups, maybeSendDailyReminders } = require('./lib/scheduledNotifier');
@@ -57,6 +60,9 @@ app.use('/api/sheets-sync', sheetsSyncRoutes);
 app.use('/api/lifestyle-options', lifestyleOptionRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/refill-checks', refillRoutes);
+app.use('/api/batches', batchRoutes);
+app.use('/api/expiration-discount-rules', expirationDiscountRuleRoutes);
+app.use('/api/promotions', promotionRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

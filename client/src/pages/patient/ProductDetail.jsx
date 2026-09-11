@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { apiFetch } from '../../api/client';
 import { addToCart } from '../../lib/cart';
 import AvailabilityBadge from '../../components/patient/AvailabilityBadge';
+import PriceDisplay from '../../components/patient/PriceDisplay';
 
 export default function ProductDetail() {
   const { user } = useAuth();
@@ -68,7 +69,7 @@ export default function ProductDetail() {
       <p className="p-greeting" style={{ marginTop: 12 }}>{product.name}</p>
       {product.brand && <p className="muted">{product.brand}</p>}
       <AvailabilityBadge availability={product.availability} />
-      {product.price != null && <p style={{ fontSize: 20, fontWeight: 700, marginTop: 8 }}>${product.price}</p>}
+      <p style={{ marginTop: 8 }}><PriceDisplay pricing={product.pricing} price={product.price} size="lg" /></p>
       {product.description && <p className="p-card__body">{product.description}</p>}
 
       {(product.directions_for_use || product.frequency) && (
@@ -110,7 +111,7 @@ export default function ProductDetail() {
               <div key={p.id} className="product-card">
                 {p.image_url && <img src={p.image_url} alt={p.name} />}
                 <strong>{p.name}</strong>
-                {p.price != null && <span>${p.price}</span>}
+                <PriceDisplay pricing={p.pricing} price={p.price} />
                 <AvailabilityBadge availability={p.availability} />
                 <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/patient/shop/${p.id}`)}>View</button>
               </div>
