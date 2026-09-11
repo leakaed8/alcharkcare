@@ -12,7 +12,9 @@ import ProductDetail from './pages/patient/ProductDetail';
 import Profile from './pages/patient/Profile';
 import ShopPage from './pages/patient/ShopPage';
 import VisitDetail from './pages/patient/VisitDetail';
+import Events from './pages/patient/Events';
 import Visits from './pages/patient/Visits';
+import EventManager from './pages/staff/EventManager';
 import ExpiringSoon from './pages/staff/ExpiringSoon';
 import FollowupDashboard from './pages/staff/FollowupDashboard';
 import GoogleSheetsSync from './pages/staff/GoogleSheetsSync';
@@ -54,6 +56,7 @@ export default function App() {
         <Route path="products" element={<ProductManager />} />
         <Route path="expiring-soon" element={<ExpiringSoon />} />
         <Route path="promotions" element={<Promotions />} />
+        <Route path="events" element={<EventManager />} />
         <Route path="lab-tests" element={<LabTestTypeManager />} />
         <Route path="messages" element={<StaffMessages />} />
         <Route path="sheets-sync" element={<GoogleSheetsSync />} />
@@ -84,6 +87,7 @@ export default function App() {
         <Route path="find" element={<FindProducts />} />
         <Route path="shop" element={<ShopPage />} />
         <Route path="shop/:id" element={<ProductDetail />} />
+        <Route path="events" element={<Events />} />
         <Route path="profile" element={<Profile />} />
       </Route>
 

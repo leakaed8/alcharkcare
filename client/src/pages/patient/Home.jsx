@@ -106,6 +106,7 @@ export default function Home() {
   const [data, setData] = useState(null);
   const [reorder, setReorder] = useState([]);
   const [dueRefill, setDueRefill] = useState(undefined); // undefined = loading, null = none due
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [error, setError] = useState('');
   const [doneToday, setDoneToday] = useState(new Set());
 
@@ -116,8 +117,11 @@ export default function Home() {
   useEffect(() => {
     apiFetch(`/patients/${user.id}`).then(setData).catch((err) => setError(err.message));
     apiFetch(`/products/reorder/${user.id}`).then(setReorder).catch(() => {});
+    apiFetch('/events/upcoming').then(setUpcomingEvents).catch(() => {});
     loadDueRefill();
   }, [user.id]);
+
+  const goingEvents = useMemo(() => upcomingEvents.filter((e) => e.my_rsvp_status === 'going').slice(0, 2), [upcomingEvents]);
 
   const plan = useMemo(() => (data ? summarizePlan(data.visits) : null), [data]);
 
@@ -220,6 +224,29 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </>
+      )}
+
+      {upcomingEvents.length > 0 && (
+        <>
+          <p className="p-section-title">Events</p>
+          {goingEvents.length > 0 ? (
+            goingEvents.map((e) => (
+              <div key={e.id} className="p-card">
+                <p className="p-card__title">{e.title}</p>
+                <p className="muted">
+                  {new Date(`${e.event_date}T00:00:00`).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                  {e.start_time && ` · ${e.start_time.slice(0, 5)}`}
+                </p>
+                <Link className="p-cta p-cta--secondary" to="/patient/events">View all events</Link>
+              </div>
+            ))
+          ) : (
+            <div className="p-card">
+              <p className="p-card__body">{upcomingEvents.length} upcoming event{upcomingEvents.length === 1 ? '' : 's'} at Al Chark.</p>
+              <Link className="p-cta" to="/patient/events">Browse events</Link>
+            </div>
+          )}
         </>
       )}
 

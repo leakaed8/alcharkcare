@@ -25,9 +25,10 @@ const refillRoutes = require('./routes/refillChecks');
 const batchRoutes = require('./routes/batches');
 const expirationDiscountRuleRoutes = require('./routes/expirationDiscountRules');
 const promotionRoutes = require('./routes/promotions');
+const eventRoutes = require('./routes/events');
 const { maybeRunAutoSync } = require('./lib/sheetsSyncRunner');
 const { registerWebhook } = require('./lib/telegramNotify');
-const { maybeNotifyDueFollowups, maybeSendDailyReminders } = require('./lib/scheduledNotifier');
+const { maybeNotifyDueFollowups, maybeSendDailyReminders, maybeSendEventReminders } = require('./lib/scheduledNotifier');
 
 // Last-resort net: a third-party lib (e.g. the OCR worker) throwing outside
 // any promise chain would otherwise crash the whole process for every user
@@ -63,6 +64,7 @@ app.use('/api/refill-checks', refillRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/expiration-discount-rules', expirationDiscountRuleRoutes);
 app.use('/api/promotions', promotionRoutes);
+app.use('/api/events', eventRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -98,6 +100,7 @@ const DAILY_JOB_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 function runDailyJobs() {
   maybeNotifyDueFollowups().catch((err) => console.error('Follow-up notify check failed:', err.message));
   maybeSendDailyReminders().catch((err) => console.error('Daily reminder check failed:', err.message));
+  maybeSendEventReminders().catch((err) => console.error('Event reminder check failed:', err.message));
 }
 setInterval(runDailyJobs, DAILY_JOB_CHECK_INTERVAL_MS);
 setTimeout(runDailyJobs, 45_000);

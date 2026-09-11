@@ -105,4 +105,32 @@ async function maybeSendDailyReminders() {
   }
 }
 
-module.exports = { maybeNotifyDueFollowups, maybeSendDailyReminders };
+// Day-before reminder for patients "going" to an event happening tomorrow.
+// reminded_at guards against a duplicate send if this ever runs more than
+// once for the same RSVP (the daily gate above already limits it to once
+// per Beirut day, but this is the record that survives across days).
+async function maybeSendEventReminders() {
+  const today = todayInBeirut();
+  const state = await getSchedulerState();
+  if (state.last_event_reminder_run_date === today) return;
+  await setSchedulerState({ last_event_reminder_run_date: today });
+
+  const { rows } = await pool.query(
+    `SELECT r.id AS rsvp_id, e.title, e.event_date::text AS event_date, e.location,
+            pt.push_subscription, pt.id AS patient_row_id
+     FROM event_rsvps r
+     JOIN events e ON e.id = r.event_id
+     JOIN patients pt ON pt.id = r.patient_id
+     WHERE r.status = 'going' AND r.reminded_at IS NULL AND e.is_active = true
+       AND e.event_date = CURRENT_DATE + INTERVAL '1 day'`
+  );
+
+  for (const r of rows) {
+    await pushToPatient({ id: r.patient_row_id, push_subscription: r.push_subscription }, {
+      title: 'Al Chark', body: `Reminder: "${r.title}" is tomorrow${r.location ? ` at ${r.location}` : ''}.`, url: '/patient/events',
+    }).catch((err) => console.error('Event reminder push error:', err.message));
+    await pool.query('UPDATE event_rsvps SET reminded_at = now() WHERE id = $1', [r.rsvp_id]);
+  }
+}
+
+module.exports = { maybeNotifyDueFollowups, maybeSendDailyReminders, maybeSendEventReminders };
