@@ -1,4 +1,5 @@
 const webpush = require('web-push');
+const pool = require('../db/pool');
 
 let configured = false;
 function ensureConfigured() {
@@ -32,4 +33,23 @@ async function sendPush(subscription, payload) {
   }
 }
 
-module.exports = { isConfigured, sendPush };
+// Shared helper for any route that needs to push a single patient a
+// status-change notification (orders, product requests, message replies,
+// the manager test-push button) without each caller re-fetching the
+// subscription or duplicating the expired-subscription cleanup.
+// Never throws -- same contract as sendPush -- so callers can safely
+// fire-and-forget with .catch(console.error).
+async function pushToPatientById(patientId, payload) {
+  if (!isConfigured()) return { ok: false, reason: 'not_configured' };
+  const { rows } = await pool.query('SELECT push_subscription FROM patients WHERE id = $1', [patientId]);
+  const subscription = rows[0]?.push_subscription;
+  if (!subscription) return { ok: false, reason: 'no_subscription' };
+
+  const result = await sendPush(subscription, payload);
+  if (!result.ok && (result.statusCode === 410 || result.statusCode === 404)) {
+    await pool.query('UPDATE patients SET push_subscription = NULL WHERE id = $1', [patientId]);
+  }
+  return result;
+}
+
+module.exports = { isConfigured, sendPush, pushToPatientById };

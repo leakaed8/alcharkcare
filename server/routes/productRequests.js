@@ -2,10 +2,22 @@ const express = require('express');
 const pool = require('../db/pool');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../lib/asyncHandler');
+const { pushToPatientById } = require('../lib/pushNotify');
 
 const router = express.Router();
 
 const VALID_STATUSES = ['requested', 'reviewing', 'ordered', 'available', 'not_available', 'fulfilled', 'cancelled'];
+
+// Only the statuses a patient would actually want a ping for. 'requested'
+// is the starting state, never something staff transition into.
+const PRODUCT_REQUEST_STATUS_MESSAGES = {
+  reviewing: "We're looking into the product you asked about.",
+  ordered: 'Good news -- we ordered the product you asked about.',
+  available: 'The product you asked about is now available!',
+  not_available: "Unfortunately we couldn't source the product you asked about.",
+  fulfilled: 'Your requested product is ready.',
+  cancelled: 'Your product request was cancelled.',
+};
 
 function resolvePatientId(req) {
   if (req.user.role === 'patient') return req.user.id;
@@ -92,6 +104,9 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
     return res.status(400).json({ error: `status must be one of ${VALID_STATUSES.join(', ')}` });
   }
 
+  const { rows: existingRows } = await pool.query('SELECT status FROM product_requests WHERE id = $1', [id]);
+  const previousStatus = existingRows[0]?.status;
+
   const { rows } = await pool.query(
     `UPDATE product_requests SET
        status = COALESCE($1, status),
@@ -104,6 +119,14 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
   );
   if (rows.length === 0) {
     return res.status(404).json({ error: 'Request not found' });
+  }
+
+  if (status && status !== previousStatus && PRODUCT_REQUEST_STATUS_MESSAGES[status]) {
+    pushToPatientById(rows[0].patient_id, {
+      title: 'Al Chark',
+      body: PRODUCT_REQUEST_STATUS_MESSAGES[status],
+      url: '/patient/find',
+    }).catch((err) => console.error('Product request push error:', err.message));
   }
   res.json(rows[0]);
 }));
