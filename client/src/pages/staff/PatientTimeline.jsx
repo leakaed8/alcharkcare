@@ -136,6 +136,7 @@ export default function PatientTimeline() {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [purchases, setPurchases] = useState([]);
+  const [checkins, setCheckins] = useState([]);
   const [labData, setLabData] = useState(null);
   const [error, setError] = useState('');
 
@@ -150,6 +151,7 @@ export default function PatientTimeline() {
   useEffect(() => {
     loadPatient();
     apiFetch(`/purchases/${id}`).then(setPurchases).catch((err) => setError(err.message));
+    apiFetch(`/checkins/${id}`).then(setCheckins).catch((err) => setError(err.message));
     loadLabs();
   }, [id]);
 
@@ -199,6 +201,20 @@ export default function PatientTimeline() {
         {purchases.map((p) => (
           <li key={p.id}>
             {p.product_name} <span className="muted">— {new Date(p.purchased_at).toLocaleDateString()}</span>
+          </li>
+        ))}
+      </ul>
+
+      <h3 className="section-title">Check-ins</h3>
+      {checkins.length === 0 && <p className="muted">No check-ins logged.</p>}
+      <ul className="followup-list">
+        {checkins.map((c) => (
+          <li key={c.id}>
+            {c.is_problem && <span className="badge badge-flag-low">Reported difficulty</span>}{' '}
+            {c.response_label}
+            {c.product_name && <span className="muted"> — {c.product_name}</span>}
+            <span className="muted"> — {new Date(c.created_at).toLocaleDateString()}</span>
+            {c.notes && <div className="muted">{c.notes}</div>}
           </li>
         ))}
       </ul>

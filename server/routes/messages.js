@@ -3,6 +3,7 @@ const pool = require('../db/pool');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../lib/asyncHandler');
 const { notifyStaff } = require('../lib/staffNotify');
+const { pushToPatientById } = require('../lib/pushNotify');
 
 const router = express.Router();
 
@@ -44,6 +45,12 @@ router.post('/', verifyToken, asyncHandler(async (req, res) => {
       title: 'New patient message',
       url: '/staff/messages',
     }).catch((err) => console.error('Message notify error:', err.message));
+  } else {
+    pushToPatientById(patientId, {
+      title: 'Al Chark',
+      body: `New message from your pharmacist: "${body.slice(0, 80)}"`,
+      url: '/patient/messages',
+    }).catch((err) => console.error('Message push error:', err.message));
   }
 
   res.status(201).json(rows[0]);

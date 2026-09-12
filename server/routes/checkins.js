@@ -46,4 +46,24 @@ router.post('/', verifyToken, asyncHandler(async (req, res) => {
   res.status(201).json(inserted[0]);
 }));
 
+// A patient's check-in history. Staff can view any patient's; a patient
+// can only view their own. Mirrors the /purchases/:patientId and
+// /photos/:patientId pattern so PatientTimeline can fetch it the same way.
+router.get('/:patientId', verifyToken, asyncHandler(async (req, res) => {
+  const { patientId } = req.params;
+  if (!canView(req, patientId)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const { rows } = await pool.query(
+    `SELECT c.*, p.name AS product_name
+     FROM checkins c
+     LEFT JOIN visit_products vp ON vp.id = c.visit_product_id
+     LEFT JOIN products p ON p.id = vp.product_id
+     WHERE c.patient_id = $1
+     ORDER BY c.created_at DESC`,
+    [patientId]
+  );
+  res.json(rows);
+}));
+
 module.exports = router;

@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db/pool');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../lib/asyncHandler');
+const { isConfigured: pushConfigured, sendPush, pushToPatientById } = require('../lib/pushNotify');
 
 const router = express.Router();
 
@@ -68,6 +69,39 @@ router.get('/segments', verifyToken, requireRole('admin'), asyncHandler(async (r
     inactive_90d: inactive.rows,
     frequent_buyers: frequentBuyers.rows,
   });
+}));
+
+// Fires one real push notification on demand, bypassing the daily
+// scheduler gate -- so an admin can confirm the whole chain (VAPID keys ->
+// service worker -> stored subscription -> delivery) actually works
+// without waiting for a real refill/order/message event.
+// target 'patient' pushes to the given patientId's own subscription;
+// target 'self' (default) pushes to the logged-in admin's own staff
+// subscription, e.g. right after enabling it from the Orders page.
+router.post('/test-push', verifyToken, requireRole('admin'), asyncHandler(async (req, res) => {
+  if (!pushConfigured()) {
+    return res.json({ ok: false, reason: 'not_configured' });
+  }
+
+  const { target, patientId } = req.body;
+  const payload = { title: 'Al Chark', body: 'Test notification -- if you see this, push works.', url: '/' };
+
+  let result;
+  if (target === 'patient') {
+    if (!patientId || !/^\d+$/.test(String(patientId))) {
+      return res.status(400).json({ error: 'patientId is required when target is "patient"' });
+    }
+    result = await pushToPatientById(Number(patientId), payload);
+  } else {
+    const { rows } = await pool.query('SELECT push_subscription FROM staff WHERE id = $1', [req.user.id]);
+    const subscription = rows[0]?.push_subscription;
+    if (!subscription) {
+      return res.json({ ok: false, reason: 'no_subscription' });
+    }
+    result = await sendPush(subscription, payload);
+  }
+
+  res.json(result);
 }));
 
 module.exports = router;

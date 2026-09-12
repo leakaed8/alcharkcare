@@ -94,6 +94,62 @@ function TelegramConnect() {
   );
 }
 
+// Fires one real push via POST /manager/test-push -- lets an admin confirm
+// VAPID keys -> service worker -> stored subscription -> delivery all
+// actually work, without waiting for a real order/refill/message event.
+// 'To myself' needs the admin to have already enabled notifications from
+// the Orders page; 'To a patient' needs that patient's id and for them to
+// have enabled notifications from their Profile page.
+function TestPushPanel() {
+  const [patientId, setPatientId] = useState('');
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function send(target) {
+    if (target === 'patient' && !patientId.trim()) {
+      setError('Enter a patient id first.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setResult(null);
+    try {
+      const body = target === 'patient' ? { target, patientId: patientId.trim() } : { target };
+      setResult(await apiFetch('/manager/test-push', { method: 'POST', body: JSON.stringify(body) }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card mb-5">
+      <p className="field-label">Test push notifications</p>
+      <p className="muted">Sends one real push so you can confirm delivery actually works end to end.</p>
+      <div className="row-actions">
+        <button className="btn btn-secondary" onClick={() => send('self')} disabled={busy}>
+          Send to myself
+        </button>
+        <input
+          className="input"
+          style={{ maxWidth: 140 }}
+          placeholder="Patient id"
+          value={patientId}
+          onChange={(e) => setPatientId(e.target.value)}
+        />
+        <button className="btn btn-secondary" onClick={() => send('patient')} disabled={busy}>
+          Send to patient
+        </button>
+      </div>
+      {result && !result.ok && <p className="alert alert-error">Not delivered -- {result.reason}.</p>}
+      {result?.ok && <p className="alert alert-success">Sent -- check that device for the notification.</p>}
+      {error && <p className="alert alert-error">{error}</p>}
+    </div>
+  );
+}
+
 export default function ManagerDashboard() {
   const [overview, setOverview] = useState(null);
   const [segments, setSegments] = useState(null);
@@ -114,6 +170,7 @@ export default function ManagerDashboard() {
       </div>
 
       <TelegramConnect />
+      <TestPushPanel />
 
       <div className="stat-grid">
         <StatCard label="Total patients" value={overview.total_patients} />

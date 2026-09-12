@@ -3,10 +3,20 @@ const pool = require('../db/pool');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../lib/asyncHandler');
 const { notifyStaffOfNewOrder } = require('../lib/orderNotify');
+const { pushToPatientById } = require('../lib/pushNotify');
 const { attachPricing } = require('../lib/pricingLookup');
 const { computeCartLineTotal } = require('../lib/pricingEngine');
 
 const router = express.Router();
+
+// One line per status a patient should actually hear about. 'pending' is
+// the order's own starting state, never a value staff transition *into*,
+// so it has no message here.
+const ORDER_STATUS_MESSAGES = {
+  confirmed: "Your order has been confirmed -- we'll have it ready soon.",
+  fulfilled: 'Your order is ready and has been marked as picked up.',
+  cancelled: 'Your order was cancelled. Contact us if that seems wrong.',
+};
 
 // Kept from the original schema design (001_init.sql) rather than inventing
 // a new vocabulary.
@@ -251,6 +261,15 @@ router.patch('/:id', verifyToken, requireRole('staff', 'admin'), asyncHandler(as
     }
 
     await client.query('COMMIT');
+
+    if (status !== existing.status && ORDER_STATUS_MESSAGES[status]) {
+      pushToPatientById(existing.patient_id, {
+        title: 'Al Chark',
+        body: ORDER_STATUS_MESSAGES[status],
+        url: '/patient/shop',
+      }).catch((err) => console.error('Order status push error:', err.message));
+    }
+
     const full = await loadOrderWithItems(rows[0].id);
     res.json(full);
   } catch (err) {
